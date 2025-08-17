@@ -1,282 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>BBWhatsapp - Home</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      height: 100vh;
-      background: #f0f2f5;
-    }
-    /* Sidebar */
-    .sidebar {
-      width: 30%;
-      background: #fff;
-      border-right: 1px solid #ddd;
-      display: flex;
-      flex-direction: column;
-    }
-    .sidebar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 15px;
-      background: #ededed;
-    }
-    .sidebar-header img {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-    }
-    .sidebar-search {
-      padding: 10px;
-      background: #f6f6f6;
-    }
-    .sidebar-search input {
-      width: 100%;
-      padding: 8px;
-      border: none;
-      border-radius: 20px;
-      outline: none;
-    }
-    .sidebar-section {
-      flex: 1;
-      overflow-y: auto;
-    }
-    .section-title {
-      padding: 10px;
-      font-weight: bold;
-      background: #f6f6f6;
-      color: #555;
-      border-top: 1px solid #ddd;
-      border-bottom: 1px solid #ddd;
-    }
-    .chat-item {
-      display: flex;
-      align-items: center;
-      padding: 10px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .chat-item:hover {
-      background: #f0f0f0;
-    }
-    .chat-item img {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      margin-right: 10px;
-    }
-    .chat-info {
-      flex: 1;
-    }
-    .chat-info h4 {
-      margin: 0;
-      font-size: 16px;
-    }
-    .chat-info p {
-      margin: 0;
-      font-size: 13px;
-      color: #777;
-    }
-
-    /* Chat area */
-    .chat {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
-    .chat-header {
-      padding: 15px;
-      background: #ededed;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #ddd;
-    }
-    .chat-header-info {
-      display: flex;
-      align-items: center;
-    }
-    .chat-header-info img {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      margin-right: 10px;
-    }
-    .chat-messages {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      background: #ece5dd;
-    }
-    .message {
-      margin-bottom: 15px;
-      padding: 10px;
-      border-radius: 10px;
-      max-width: 60%;
-      clear: both;
-    }
-    .own-message {
-      background: #dcf8c6;
-      margin-left: auto;
-    }
-    .other-message {
-      background: #fff;
-      margin-right: auto;
-    }
-    .system-message {
-      text-align: center;
-      color: #888;
-      font-size: 12px;
-    }
-    .chat-form {
-      display: flex;
-      padding: 10px;
-      background: #f0f0f0;
-      border-top: 1px solid #ddd;
-    }
-    .chat-form input {
-      flex: 1;
-      padding: 10px;
-      border-radius: 20px;
-      border: none;
-      outline: none;
-    }
-    .chat-form button {
-      background: #008069;
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      margin-left: 10px;
-      cursor: pointer;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <img src="/images/default-avatar.png" alt="Profile">
-      <div>
-        <a href="/logout">Logout</a>
-      </div>
-    </div>
-    <div class="sidebar-search">
-      <input type="text" placeholder="Search chats or groups...">
-    </div>
-
-    <!-- Chats Section -->
-    <div class="sidebar-section">
-      <div class="section-title">Chats</div>
-      <% if (users && users.length > 0) { %>
-        <% users.forEach(user => { %>
-          <div class="chat-item" onclick="openChat('<%= user.username %>','user')">
-            <img src="/images/default-avatar.png" alt="<%= user.username %>">
-            <div class="chat-info">
-              <h4><%= user.username %></h4>
-              <p>Click to chat</p>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1><i class="fas fa-comment-dots"></i> BBWhatsApp</h1>
+            <div class="header-actions">
+                <a href="/profile" class="profile-btn">
+                    <img src="<%= user.getProfileImage() %>" alt="Profile" class="profile-img-sm">
+                </a>
+                <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i></a>
             </div>
-          </div>
-        <% }) %>
-      <% } else { %>
-        <p style="padding:10px;color:#777;">No users available</p>
-      <% } %>
+        </header>
+
+        <!-- WhatsApp Tabs -->
+        <nav class="wa-tabs">
+            <button class="tab-btn active" data-tab="chats"><i class="fas fa-comments"></i> Chats</button>
+            <button class="tab-btn" data-tab="status"><i class="fas fa-circle-notch"></i> Status</button>
+            <button class="tab-btn" data-tab="calls"><i class="fas fa-phone"></i> Calls</button>
+        </nav>
+
+        <div class="app-content">
+            <!-- Sidebar with conversations (only shows in Chats tab) -->
+            <aside class="sidebar tab-content active" id="chats">
+                <div class="search-container">
+                    <input type="text" placeholder="Search..." class="search-input">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+
+                <!-- Sidebar menu -->
+                <div class="sidebar-menu">
+                    <a href="/home" class="menu-item active"><i class="fas fa-comments"></i> Chats</a>
+                    <a href="/profile" class="menu-item"><i class="fas fa-user"></i> Profile</a>
+                </div>
+
+                <!-- Recent Conversations -->
+                <div class="conversations-list">
+                    <div class="list-header">
+                        <h3>Recent Chats</h3>
+                    </div>
+                    <% if (conversations.length > 0) { %>
+                        <% conversations.forEach(conv => { 
+                            const otherUser = conv.participants.find(p => !p._id.equals(user._id));
+                            const lastMessage = conv.messages[0];
+                        %>
+                            <a href="/chat/<%= conv._id %>" class="conversation-item">
+                                <img src="<%= otherUser?.getProfileImage() %>" alt="<%= otherUser?.username || 'User' %>" class="profile-img-sm">
+                                <div class="conversation-details">
+                                    <div class="conversation-header">
+                                        <span class="conversation-name"><%= otherUser?.username || 'Unknown User' %></span>
+                                        <% if (lastMessage) { %>
+                                            <span class="conversation-time">
+                                                <%= new Date(lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %>
+                                            </span>
+                                        <% } %>
+                                    </div>
+                                    <div class="conversation-preview">
+                                        <% if (lastMessage) { %>
+                                            <% if (lastMessage.sender._id.equals(user._id)) { %>
+                                                <span>You: </span>
+                                            <% } %>
+                                            <%= lastMessage.text ? lastMessage.text.substring(0, 30) : '[Media]' %>
+                                        <% } else { %>
+                                            <span>Start a new conversation</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </a>
+                        <% }); %>
+                    <% } else { %>
+                        <div class="empty-state">
+                            <p>No conversations yet</p>
+                            <a href="/profile" class="btn">Find friends to chat with</a>
+                        </div>
+                    <% } %>
+                </div>
+
+                <!-- Group chat section -->
+                <div class="group-chat-section">
+                    <a href="/chat" class="group-chat-btn">
+                        <i class="fas fa-users"></i> Group Chat
+                    </a>
+                </div>
+            </aside>
+
+            <!-- Status Tab -->
+            <section class="tab-content" id="status">
+                <div class="status-section">
+                    <h3>Status Updates</h3>
+                    <p>Here you can view and add status updates (feature to be added).</p>
+                </div>
+            </section>
+
+            <!-- Calls Tab -->
+            <section class="tab-content" id="calls">
+                <div class="calls-section">
+                    <h3>Recent Calls</h3>
+                    <p>No calls yet. Start a new call soon!</p>
+                </div>
+            </section>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <div class="welcome-section">
+                    <div class="welcome-content">
+                        <h2>Welcome, <%= user.username %></h2>
+                        <p>Select a conversation or start a new one</p>
+
+                        <div class="group-chat-card">
+                            <h3>Public Group Chat</h3>
+                            <p>Chat with everyone in the BBWhatsApp community</p>
+                            <a href="/chat" class="btn">Join Group</a>
+                        </div>
+                    </div>
+
+                    <div class="recent-messages">
+                        <h3>Recent Group Messages</h3>
+                        <% if (groupMessages.length > 0) { %>
+                            <div class="messages-list">
+                                <% groupMessages.forEach(msg => { %>
+                                    <% if (msg.sender) { %>
+                                        <div class="message-preview">
+                                            <img src="<%= msg.sender.getProfileImage() %>" alt="<%= msg.sender.username %>" class="profile-img-xs">
+                                            <div class="message-content">
+                                                <span class="sender-name"><%= msg.sender.username %></span>
+                                                <p class="message-text">
+                                                    <%= msg.text ? msg.text.substring(0, 50) : (msg.media ? '[Media]' : '[Message]') %>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    <% } %>
+                                <% }); %>
+                            </div>
+                        <% } else { %>
+                            <p>No recent messages in the group</p>
+                        <% } %>
+                    </div>
+                </div>
+            </main>
+        </div>
     </div>
 
-    <!-- Groups Section -->
-    <div class="sidebar-section">
-      <div class="section-title">Groups</div>
-      <% if (groups && groups.length > 0) { %>
-        <% groups.forEach(group => { %>
-          <div class="chat-item" onclick="openChat('<%= group.name %>','group')">
-            <img src="/images/default-group.png" alt="<%= group.name %>">
-            <div class="chat-info">
-              <h4><%= group.name %></h4>
-              <p>Group chat</p>
-            </div>
-          </div>
-        <% }) %>
-      <% } else { %>
-        <p style="padding:10px;color:#777;">No groups available</p>
-      <% } %>
-    </div>
-  </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
 
-  <!-- Chat Area -->
-  <div class="chat">
-    <div class="chat-header">
-      <div class="chat-header-info">
-        <img src="/images/default-avatar.png" id="chat-avatar">
-        <h4 id="chat-name">Select a chat</h4>
-      </div>
-      <div>
-        <button>📞</button>
-        <button>🎥</button>
-        <button>ℹ️</button>
-      </div>
-    </div>
+            // Join user's personal room
+            socket.emit('join', '<%= user._id %>');
 
-    <div class="chat-messages" id="chat-messages">
-      <p class="system-message">Select a chat or group to start messaging</p>
-    </div>
+            // Handle user status
+            socket.on('userStatus', (data) => {
+                console.log(`User ${data.userId} is ${data.isOnline ? 'online' : 'offline'}`);
+            });
 
-    <form id="chat-form" class="chat-form">
-      <input type="text" id="msg" placeholder="Type a message...">
-      <button type="submit">➤</button>
-    </form>
-  </div>
+            // New message notification
+            socket.on('newMessageNotification', (data) => {
+                console.log('New message notification:', data);
+            });
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    const chatMessages = document.getElementById('chat-messages');
-    const chatForm = document.getElementById('chat-form');
-    const messageInput = document.getElementById('msg');
-    let currentChat = null;
-    let currentChatType = null;
+            // Real-time messages
+            socket.on('message', (message) => {
+                console.log('New message received:', message);
+            });
 
-    function openChat(name, type) {
-      currentChat = name;
-      currentChatType = type;
-      document.getElementById('chat-name').innerText = name;
-      chatMessages.innerHTML = '';
-      socket.emit('joinChat', { name, type });
-    }
+            // Tab switching
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
 
-    socket.on('message', message => {
-      const div = document.createElement('div');
-      div.classList.add('message');
-      if (message.username === '<%= username %>') {
-        div.classList.add('own-message');
-      } else if (message.username === 'System') {
-        div.classList.add('system-message');
-      } else {
-        div.classList.add('other-message');
-      }
-      div.innerHTML = `
-        <p><strong>${message.username}</strong> <span style="font-size:11px;color:#777;">${new Date(message.timestamp).toLocaleTimeString()}</span></p>
-        <p>${message.text}</p>
-      `;
-      chatMessages.appendChild(div);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
 
-    chatForm.addEventListener('submit', e => {
-      e.preventDefault();
-      if (!currentChat) return alert("Select a chat or group first!");
-      const msg = messageInput.value;
-      if (msg.trim() !== "") {
-        socket.emit('chatMessage', { chat: currentChat, type: currentChatType, username: '<%= username %>', text: msg });
-        messageInput.value = '';
-        messageInput.focus();
-      }
-    });
-  </script>
+                    const target = btn.getAttribute('data-tab');
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    document.getElementById(target).classList.add('active');
+                });
+            });
+        });
+    </script>
 </body>
 </html>
