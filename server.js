@@ -1,3 +1,4 @@
+// server.js
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -10,27 +11,25 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const { getLinkPreview } = require('link-preview-js');
 const http = require('http');
-const socketio = require('socket.io');
+const socketIo = require('socket.io');
 
-// Initialize app & sockets
+// Initialize app
 const app = express();
 const server = http.createServer(app);
-const io = socketio(server, {
-  cors: { origin: '*', methods: ['GET','POST'] }
-});
+const io = socketIo(server);
 
-// Trust proxy for Heroku/Render
+// Trust proxy for Heroku (if used)
 app.set('trust proxy', 1);
 
-// Fail-fast on fatal errors
+// Crash on uncaught exceptions in dev to see stack
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
   process.exit(1);
 });
 
-// ============================
+// --------------------
 // MongoDB connection
-// ============================
+// --------------------
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bbwhatsapp';
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
@@ -41,33 +40,37 @@ mongoose.connect(MONGODB_URI, {
 .then(() => console.log('MongoDB Connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-mongoose.connection.on('error', err => console.error('MongoDB connection error:', err));
-mongoose.connection.on('disconnected', () => console.log('MongoDB disconnected'));
+mongoose.connection.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected');
+});
 
-// ============================
-// Models (as in your project)
-// ============================
+// --------------------
+// Models (your project should have these files)
+// --------------------
 const User = require('./models/User');
 const Message = require('./models/Message');
 const Conversation = require('./models/Conversation');
 
-// ============================
+// --------------------
 // Multer (memory storage)
-// ============================
+// --------------------
 const storage = multer.memoryStorage();
 const upload = multer({
-  storage,
+  storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg','image/png','image/gif','video/mp4','audio/mpeg'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'audio/mpeg'];
+    if (allowedTypes.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Invalid file type'), false);
   }
 });
 
-// ============================
-// Express & EJS
-// ============================
+// --------------------
+// Express middleware and view engine
+// --------------------
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -77,9 +80,9 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 app.set('layout', 'layouts/layout');
 
-// ============================
+// --------------------
 // Session
-// ============================
+// --------------------
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-here-' + uuidv4(),
   store: new MemoryStore({ checkPeriod: 86400000 }),
@@ -93,23 +96,23 @@ app.use(session({
   }
 }));
 
-// Current user into locals
+// expose current user to views
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user;
   next();
 });
 
-// ============================
-// Routes
-// ============================
+// --------------------
+// Routes (same structure as your original app)
+// --------------------
 
-// Home redirect
+// Home route
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/home');
   res.redirect('/login');
 });
 
-// Home w/ conversations + latest group slice
+// Home with conversations & group messages
 app.get('/home', async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
@@ -127,20 +130,20 @@ app.get('/home', async (req, res, next) => {
       type: 'chat',
       $or: [{ deleted: false }, { type: 'system' }]
     })
-    .sort({ createdAt: -1 })
-    .limit(100)
-    .populate('sender', 'username profileImage');
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate('sender', 'username profileImage');
 
     const conversations = await Conversation.find({
       participants: req.session.user.id
     })
-    .populate('participants', 'username profileImage status')
-    .populate({
-      path: 'messages',
-      options: { sort: { createdAt: -1 }, limit: 1 },
-      populate: { path: 'sender', select: 'username profileImage' }
-    })
-    .sort({ updatedAt: -1 });
+      .populate('participants', 'username profileImage status')
+      .populate({
+        path: 'messages',
+        options: { sort: { createdAt: -1 }, limit: 1 },
+        populate: { path: 'sender', select: 'username profileImage' }
+      })
+      .sort({ updatedAt: -1 });
 
     res.render('home', {
       title: 'BBWhatsApp - Home',
@@ -153,7 +156,7 @@ app.get('/home', async (req, res, next) => {
   }
 });
 
-// Chat (group or 1:1 by conversationId)
+// Chat page (group or conversation)
 app.get('/chat/:conversationId?', async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
@@ -167,10 +170,7 @@ app.get('/chat/:conversationId?', async (req, res, next) => {
       conversation = await Conversation.findById(conversationId)
         .populate('participants', 'username profileImage status');
 
-      if (
-        !conversation ||
-        !conversation.participants.some(p => p._id.toString() === req.session.user.id.toString())
-      ) {
+      if (!conversation || !conversation.participants.some(p => p._id.toString() === req.session.user.id.toString())) {
         return res.status(403).send('Access denied');
       }
 
@@ -180,19 +180,19 @@ app.get('/chat/:conversationId?', async (req, res, next) => {
         conversation: conversationId,
         deleted: false
       })
-      .sort({ createdAt: 1 })
-      .populate('sender', 'username profileImage');
+        .sort({ createdAt: 1 })
+        .populate('sender', 'username profileImage');
     } else {
+      // group
       messages = await Message.find({
         type: 'chat',
         $or: [{ deleted: false }, { type: 'system' }]
       })
-      .sort({ createdAt: 1 })
-      .limit(100)
-      .populate('sender', 'username profileImage');
+        .sort({ createdAt: 1 })
+        .limit(100)
+        .populate('sender', 'username profileImage');
     }
 
-    // Expose identifiers to the view for chat.js
     res.render('chat', {
       title: conversationId ? `Chat with ${otherUser?.username}` : 'BBWhatsApp Group',
       username: req.session.user.username,
@@ -207,7 +207,7 @@ app.get('/chat/:conversationId?', async (req, res, next) => {
   }
 });
 
-// Profile
+// Profile page
 app.get('/profile/:userId?', async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
@@ -222,7 +222,7 @@ app.get('/profile/:userId?', async (req, res, next) => {
 
     const isOwnProfile = userId.toString() === req.session.user.id.toString();
     const isFollowing = !isOwnProfile &&
-      Array.isArray(req.session.user.following) &&
+      req.session.user.following &&
       req.session.user.following.some(u => u._id?.toString?.() === user._id.toString());
 
     res.render('profile', {
@@ -236,7 +236,7 @@ app.get('/profile/:userId?', async (req, res, next) => {
   }
 });
 
-// Update Profile
+// Update profile
 app.post('/profile/update', upload.single('profileImage'), async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
@@ -246,7 +246,7 @@ app.post('/profile/update', upload.single('profileImage'), async (req, res, next
 
     if (req.file) {
       updateData.profileImage = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-      // TODO: delete old profile image from cloud storage if needed
+      // Optionally delete old image from storage if needed
     }
 
     await User.findByIdAndUpdate(req.session.user.id, updateData);
@@ -274,6 +274,7 @@ app.post('/profile/update', upload.single('profileImage'), async (req, res, next
 app.post('/follow/:userId', async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
+
     const userIdToFollow = req.params.userId;
 
     if (userIdToFollow === req.session.user.id.toString()) {
@@ -298,6 +299,7 @@ app.post('/follow/:userId', async (req, res, next) => {
 app.post('/unfollow/:userId', async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
+
     const userIdToUnfollow = req.params.userId;
 
     await User.findByIdAndUpdate(req.session.user.id, { $pull: { following: userIdToUnfollow }});
@@ -315,24 +317,20 @@ app.post('/unfollow/:userId', async (req, res, next) => {
   }
 });
 
-// Start 1:1 conversation
+// New 1:1 chat
 app.get('/new-chat/:userId', async (req, res, next) => {
   try {
     if (!req.session.user || !req.session.user.id) return res.redirect('/login');
 
     const otherUserId = req.params.userId;
-    if (otherUserId === req.session.user.id.toString()) {
-      return res.status(400).send('Cannot chat with yourself');
-    }
+    if (otherUserId === req.session.user.id.toString()) return res.status(400).send('Cannot chat with yourself');
 
     let conversation = await Conversation.findOne({
       participants: { $all: [req.session.user.id, otherUserId], $size: 2 }
     });
 
     if (!conversation) {
-      conversation = new Conversation({
-        participants: [req.session.user.id, otherUserId]
-      });
+      conversation = new Conversation({ participants: [req.session.user.id, otherUserId] });
       await conversation.save();
     }
 
@@ -342,7 +340,7 @@ app.get('/new-chat/:userId', async (req, res, next) => {
   }
 });
 
-// Auth pages
+// Login / Register
 app.get('/login', (req, res) => {
   if (req.session.user) return res.redirect('/home');
   res.render('login', { title: 'Login - BBWhatsApp', error: null });
@@ -352,7 +350,6 @@ app.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-
     if (!user) {
       return res.render('login', { title: 'Login - BBWhatsApp', error: 'Invalid credentials' });
     }
@@ -387,7 +384,6 @@ app.get('/register', (req, res) => {
 app.post('/register', upload.single('profileImage'), async (req, res, next) => {
   try {
     const { username, email, password, confirmPassword } = req.body;
-
     if (password !== confirmPassword) {
       return res.render('register', { title: 'Register - BBWhatsApp', error: 'Passwords do not match' });
     }
@@ -438,7 +434,7 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// Uploads (inline base64)
+// File upload endpoint (returns base64 data URI)
 app.post('/upload', upload.single('media'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   res.json({
@@ -447,9 +443,9 @@ app.post('/upload', upload.single('media'), (req, res) => {
   });
 });
 
-// ============================
-// Errors
-// ============================
+// --------------------
+// Error handlers & 404
+// --------------------
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).render('error', {
@@ -467,33 +463,48 @@ app.use((req, res) => {
   });
 });
 
-// ============================
-// Socket.IO
-// ============================
-const activeUsers = new Map();    // userId -> socketId
-const typingUsers = new Map();    // conversationId -> Set<userId>
+// --------------------
+// Socket.IO Implementation (supports multiple sockets per user)
+// --------------------
+/**
+ * activeUsers: Map<userId, Set<socketId>>
+ * socketUser: Map<socketId, userId>
+ * typingUsers: Map<conversationId, Set<userId>>
+ */
+const activeUsers = new Map();
+const socketUser = new Map();
+const typingUsers = new Map();
 
 io.on('connection', (socket) => {
   let currentUserId = null;
 
-  // Join app (by userId)
+  // client should emit 'join' passing userId (from session)
   socket.on('join', async (userId) => {
     if (!userId) return;
-
     currentUserId = userId.toString();
-    activeUsers.set(currentUserId, socket.id);
-    socket.join(currentUserId);
 
+    // track mapping userId -> set of socketIds
+    if (!activeUsers.has(currentUserId)) activeUsers.set(currentUserId, new Set());
+    activeUsers.get(currentUserId).add(socket.id);
+    socketUser.set(socket.id, currentUserId);
+
+    // join a private room for the user so we can emit direct notifications
+    socket.join(`user:${currentUserId}`);
+
+    // notify followers/contacts if you want to
     try {
       const user = await User.findById(currentUserId).populate('following', '_id');
       if (user) {
         user.following.forEach(contact => {
-          const cId = contact._id.toString();
-          if (activeUsers.has(cId)) {
-            io.to(activeUsers.get(cId)).emit('userStatus', {
-              userId: currentUserId,
-              isOnline: true,
-              lastSeen: null
+          const cid = contact._id.toString();
+          if (activeUsers.has(cid)) {
+            // notify online status to the contact's sockets
+            [...activeUsers.get(cid)].forEach(sid => {
+              io.to(sid).emit('userStatus', {
+                userId: currentUserId,
+                isOnline: true,
+                lastSeen: null
+              });
             });
           }
         });
@@ -503,38 +514,45 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Join a conversation room
+  // join a conversation room (group or private conversation id)
   socket.on('joinConversation', async (conversationId) => {
     if (!conversationId || !currentUserId) return;
 
     try {
       const conversation = await Conversation.findById(conversationId);
-      if (
-        !conversation ||
-        !conversation.participants.some(p => p.toString() === currentUserId)
-      ) {
+      if (!conversation) {
+        // unknown conversation - ignore
         return;
       }
 
+      // ensure user is participant if private
+      const isParticipant = conversation.participants.some(p => p.toString() === currentUserId);
+      if (!isParticipant) return;
+
       socket.join(conversationId);
 
-      // mark unread as read for this user
+      // mark unread messages as read by this user
       await Message.updateMany(
         {
           conversation: conversationId,
           sender: { $ne: currentUserId },
           read: false
         },
-        { $set: { read: true }, $addToSet: { readBy: currentUserId } }
+        {
+          $set: { read: true },
+          $addToSet: { readBy: currentUserId }
+        }
       );
 
-      // notify others
+      // notify other participants that messages were read
       conversation.participants.forEach(pid => {
         const pidStr = pid.toString();
         if (pidStr !== currentUserId && activeUsers.has(pidStr)) {
-          io.to(activeUsers.get(pidStr)).emit('messagesRead', {
-            conversationId,
-            readerId: currentUserId
+          [...activeUsers.get(pidStr)].forEach(sid => {
+            io.to(sid).emit('messagesRead', {
+              conversationId,
+              readerId: currentUserId
+            });
           });
         }
       });
@@ -547,30 +565,22 @@ io.on('connection', (socket) => {
     if (conversationId) socket.leave(conversationId);
   });
 
-  // Send message
+  // chatMessage: supports group (no conversationId -> type 'chat') and private (conversationId present)
   socket.on('chatMessage', async (msg) => {
     if (!currentUserId) return;
-
     try {
-      let conversation;
+      let conversation = null;
       let isGroup = false;
 
       if (msg.conversationId) {
         conversation = await Conversation.findById(msg.conversationId);
-        if (
-          !conversation ||
-          !conversation.participants.some(p => p.toString() === currentUserId)
-        ) {
-          return;
-        }
+        if (!conversation || !conversation.participants.some(p => p.toString() === currentUserId)) return;
       } else {
-        // group message only if user follows someone (your rule)
-        const user = await User.findById(currentUserId);
-        if (!user || user.following.length === 0) return;
+        // group message
         isGroup = true;
       }
 
-      // reply payload
+      // replyTo processing
       let replyTo = null;
       if (msg.replyTo?.id) {
         const original = await Message.findOne({ id: msg.replyTo.id });
@@ -583,32 +593,33 @@ io.on('connection', (socket) => {
         }
       }
 
-      // link preview
+      // link preview (first url only)
       let linkPreview = null;
       if (msg.text) {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const urls = msg.text.match(urlRegex);
-        if (urls && urls.length > 0) {
+        if (urls && urls.length) {
           try {
             const preview = await getLinkPreview(urls[0]);
             linkPreview = {
               url: urls[0],
               title: preview.title || '',
               description: preview.description || '',
-              image: Array.isArray(preview.images) && preview.images.length ? preview.images[0] : null,
+              image: (preview.images && preview.images.length) ? preview.images[0] : null,
               domain: new URL(urls[0]).hostname.replace('www.', '')
             };
           } catch (err) {
-            console.error('Link preview error:', err);
+            console.error('Link preview error:', err.message || err);
           }
         }
       }
 
-      const message = new Message({
+      // create message document
+      const messageDoc = new Message({
         id: uuidv4(),
         conversation: msg.conversationId || null,
         sender: currentUserId,
-        text: msg.text,
+        text: msg.text || '',
         type: isGroup ? 'chat' : 'private',
         replyTo,
         media: msg.media || null,
@@ -621,65 +632,81 @@ io.on('connection', (socket) => {
         deleted: false
       });
 
-      await message.save();
+      await messageDoc.save();
 
-      if (!isGroup) {
+      // if private, append message id to conversation
+      if (!isGroup && conversation) {
         conversation.updatedAt = new Date();
-        conversation.messages.push(message._id);
+        conversation.messages.push(messageDoc._id);
         await conversation.save();
       }
 
-      const populatedMessage = await Message.findById(message._id)
-        .populate('sender', 'username profileImage');
+      // populate sender for emitting
+      const populatedMessage = await Message.findById(messageDoc._id).populate('sender', 'username profileImage');
 
+      // Broadcast
       if (isGroup) {
         io.emit('message', populatedMessage);
       } else {
+        // emit to the conversation room
         io.to(msg.conversationId).emit('message', populatedMessage);
 
-        // notify participants not currently in the room
+        // Notify participants who are not in the room (send to their user:<id> rooms)
         conversation.participants.forEach(participantId => {
           const pid = participantId.toString();
           if (pid === currentUserId) return;
-          const room = socket.adapter.rooms.get(msg.conversationId); // Set of socketIds
-          const targetSocketId = activeUsers.get(pid);
-          const inRoom = room && targetSocketId && room.has(targetSocketId);
 
-          if (!inRoom && activeUsers.has(pid)) {
-            io.to(targetSocketId).emit('newMessageNotification', {
-              conversationId: msg.conversationId,
-              message: populatedMessage
-            });
+          // check if any of participant's sockets are in conversation room
+          const room = socket.adapter.rooms.get(msg.conversationId);
+          let participantInRoom = false;
+          if (room && activeUsers.has(pid)) {
+            for (const sid of activeUsers.get(pid)) {
+              if (room.has(sid)) {
+                participantInRoom = true;
+                break;
+              }
+            }
+          }
+
+          if (!participantInRoom && activeUsers.has(pid)) {
+            // send new message notification to all sockets of participant
+            for (const sid of activeUsers.get(pid)) {
+              io.to(sid).emit('newMessageNotification', {
+                conversationId: msg.conversationId,
+                message: populatedMessage
+              });
+            }
           }
         });
       }
 
-      // naive auto-read if multiple present or group
+      // auto mark read if room has >1 socket (naive)
       setTimeout(async () => {
         try {
-          const room = msg.conversationId ? socket.adapter.rooms.get(msg.conversationId) : null;
+          const room = msg.conversationId ? socket.adapter.rooms.get(msg.conversationId) : socket.adapter.rooms.get('group');
           if (isGroup || (room && room.size > 1)) {
-            message.read = true;
-            if (!Array.isArray(message.readBy)) message.readBy = [];
-            if (!message.readBy.includes(currentUserId)) message.readBy.push(currentUserId);
-            await message.save();
+            messageDoc.read = true;
+            if (!Array.isArray(messageDoc.readBy)) messageDoc.readBy = [];
+            if (!messageDoc.readBy.includes(currentUserId)) messageDoc.readBy.push(currentUserId);
+            await messageDoc.save();
 
             if (isGroup) {
-              io.emit('messageUpdated', message);
+              io.emit('messageUpdated', messageDoc);
             } else {
-              io.to(msg.conversationId).emit('messageUpdated', message);
+              io.to(msg.conversationId).emit('messageUpdated', messageDoc);
             }
           }
         } catch (err) {
           console.error('Message read update error:', err);
         }
       }, 2000);
+
     } catch (err) {
       console.error('Chat message error:', err);
     }
   });
 
-  // Edit message
+  // editMessage
   socket.on('editMessage', async (data) => {
     try {
       const message = await Message.findOne({ id: data.messageId }).populate('sender', '_id');
@@ -699,7 +726,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Delete message
+  // deleteMessage
   socket.on('deleteMessage', async (data) => {
     try {
       const message = await Message.findOne({ id: data.messageId }).populate('sender', '_id');
@@ -719,106 +746,100 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Reactions
+  // reactToMessage
   socket.on('reactToMessage', async (data) => {
     try {
       const message = await Message.findOne({ id: data.messageId });
-      if (message) {
-        if (!message.reactions[data.icon]) {
-          message.reactions[data.icon] = [];
-        }
+      if (!message) return;
 
-        const idx = message.reactions[data.icon].indexOf(currentUserId);
-        if (idx > -1) {
-          message.reactions[data.icon].splice(idx, 1);
-          if (message.reactions[data.icon].length === 0) {
-            delete message.reactions[data.icon];
-          }
-        } else {
-          message.reactions[data.icon].push(currentUserId);
-        }
+      if (!message.reactions) message.reactions = {};
 
-        await message.save();
+      if (!Array.isArray(message.reactions[data.icon])) message.reactions[data.icon] = [];
 
-        if (message.type === 'chat') {
-          io.emit('messageUpdated', message);
-        } else {
-          io.to(message.conversation.toString()).emit('messageUpdated', message);
-        }
+      const idx = message.reactions[data.icon].indexOf(currentUserId);
+      if (idx > -1) {
+        message.reactions[data.icon].splice(idx, 1);
+        if (message.reactions[data.icon].length === 0) delete message.reactions[data.icon];
+      } else {
+        message.reactions[data.icon].push(currentUserId);
+      }
+
+      await message.save();
+
+      if (message.type === 'chat') {
+        io.emit('messageUpdated', message);
+      } else {
+        io.to(message.conversation.toString()).emit('messageUpdated', message);
       }
     } catch (err) {
       console.error('React to message error:', err);
     }
   });
 
-  // Typing indicator
+  // typing indicator
   socket.on('typing', (data) => {
     if (!currentUserId || !data.conversationId) return;
-
     try {
       const isTyping = data.isTyping !== false;
-
       if (isTyping) {
-        if (!typingUsers.has(data.conversationId)) {
-          typingUsers.set(data.conversationId, new Set());
-        }
+        if (!typingUsers.has(data.conversationId)) typingUsers.set(data.conversationId, new Set());
         typingUsers.get(data.conversationId).add(currentUserId);
       } else if (typingUsers.has(data.conversationId)) {
         typingUsers.get(data.conversationId).delete(currentUserId);
-        if (typingUsers.get(data.conversationId).size === 0) {
-          typingUsers.delete(data.conversationId);
-        }
+        if (typingUsers.get(data.conversationId).size === 0) typingUsers.delete(data.conversationId);
       }
 
-      const currentTyping = typingUsers.has(data.conversationId)
-        ? Array.from(typingUsers.get(data.conversationId))
-        : [];
-
+      const currentTypingUsers = typingUsers.has(data.conversationId) ? Array.from(typingUsers.get(data.conversationId)) : [];
       socket.to(data.conversationId).emit('typing', {
         conversationId: data.conversationId,
         userId: currentUserId,
         isTyping,
-        typingUsers: currentTyping
+        typingUsers: currentTypingUsers
       });
     } catch (err) {
       console.error('Typing indicator error:', err);
     }
   });
 
-  // Disconnect
+  // disconnect handling
   socket.on('disconnect', async () => {
-    if (currentUserId) {
-      activeUsers.delete(currentUserId);
+    if (!currentUserId) return;
 
-      try {
-        const user = await User.findByIdAndUpdate(
-          currentUserId,
-          { lastSeen: new Date() },
-          { new: true }
-        ).populate('following', '_id');
+    // remove socket id from user's set
+    if (activeUsers.has(currentUserId)) {
+      activeUsers.get(currentUserId).delete(socket.id);
+      if (activeUsers.get(currentUserId).size === 0) activeUsers.delete(currentUserId);
+    }
+    socketUser.delete(socket.id);
 
+    // if user fully disconnected (no sockets), update lastSeen and notify followers/contacts
+    try {
+      if (!activeUsers.has(currentUserId)) {
+        const user = await User.findByIdAndUpdate(currentUserId, { lastSeen: new Date() }, { new: true }).populate('following', '_id');
         if (user) {
           user.following.forEach(contact => {
-            const cId = contact._id.toString();
-            if (activeUsers.has(cId)) {
-              io.to(activeUsers.get(cId)).emit('userStatus', {
-                userId: currentUserId,
-                isOnline: false,
-                lastSeen: user.lastSeen
+            const cid = contact._id.toString();
+            if (activeUsers.has(cid)) {
+              [...activeUsers.get(cid)].forEach(sid => {
+                io.to(sid).emit('userStatus', {
+                  userId: currentUserId,
+                  isOnline: false,
+                  lastSeen: user.lastSeen
+                });
               });
             }
           });
         }
-      } catch (err) {
-        console.error('Disconnect error:', err);
       }
+    } catch (err) {
+      console.error('Disconnect error:', err);
     }
   });
 });
 
-// ============================
+// --------------------
 // Start server
-// ============================
+// --------------------
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
