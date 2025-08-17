@@ -1,192 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %></title>
-    <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="/css/home.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <meta charset="UTF-8">
+  <title>BBWhatsapp - Chat</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; }
+    #chat-container { display: flex; height: 100vh; }
+    #sidebar { width: 25%; background:#f0f0f0; border-right:1px solid #ccc; padding:10px; overflow-y:auto; }
+    #chat { flex: 1; display:flex; flex-direction: column; }
+    #chat-header { padding:10px; border-bottom:1px solid #ccc; background:#eee; font-weight:bold; }
+    #messages { flex:1; padding:10px; overflow-y:auto; }
+    #form { display:flex; border-top:1px solid #ccc; }
+    #form input { flex:1; padding:10px; border:none; }
+    #form button { padding:10px; border:none; background:#25d366; color:white; cursor:pointer; }
+    .msg { margin:5px 0; }
+    .system { color:gray; font-style:italic; }
+    .me { color:green; }
+    .user-item { cursor:pointer; padding:5px; }
+    .user-item:hover { background:#ddd; }
+  </style>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <h1><i class="fas fa-comment-dots"></i> BBWhatsApp</h1>
-            <div class="header-actions">
-                <a href="/profile" class="profile-btn">
-                    <img src="<%= user.getProfileImage() %>" alt="Profile" class="profile-img-sm">
-                </a>
-                <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i></a>
-            </div>
-        </header>
+  <div id="chat-container">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <h3>Users</h3>
+      <ul id="users">
+        <% if (users && users.length > 0) { %>
+          <% users.forEach(function(u){ %>
+            <li class="user-item"><%= u %></li>
+          <% }) %>
+        <% } %>
+      </ul>
 
-        <!-- WhatsApp Tabs -->
-        <nav class="wa-tabs">
-            <button class="tab-btn active" data-tab="chats"><i class="fas fa-comments"></i> Chats</button>
-            <button class="tab-btn" data-tab="status"><i class="fas fa-circle-notch"></i> Status</button>
-            <button class="tab-btn" data-tab="calls"><i class="fas fa-phone"></i> Calls</button>
-        </nav>
-
-        <div class="app-content">
-            <!-- Sidebar with conversations (only shows in Chats tab) -->
-            <aside class="sidebar tab-content active" id="chats">
-                <div class="search-container">
-                    <input type="text" placeholder="Search..." class="search-input">
-                    <i class="fas fa-search search-icon"></i>
-                </div>
-
-                <!-- Sidebar menu -->
-                <div class="sidebar-menu">
-                    <a href="/home" class="menu-item active"><i class="fas fa-comments"></i> Chats</a>
-                    <a href="/profile" class="menu-item"><i class="fas fa-user"></i> Profile</a>
-                </div>
-
-                <!-- Recent Conversations -->
-                <div class="conversations-list">
-                    <div class="list-header">
-                        <h3>Recent Chats</h3>
-                    </div>
-                    <% if (conversations.length > 0) { %>
-                        <% conversations.forEach(conv => { 
-                            const otherUser = conv.participants.find(p => !p._id.equals(user._id));
-                            const lastMessage = conv.messages[0];
-                        %>
-                            <a href="/chat/<%= conv._id %>" class="conversation-item">
-                                <img src="<%= otherUser?.getProfileImage() %>" alt="<%= otherUser?.username || 'User' %>" class="profile-img-sm">
-                                <div class="conversation-details">
-                                    <div class="conversation-header">
-                                        <span class="conversation-name"><%= otherUser?.username || 'Unknown User' %></span>
-                                        <% if (lastMessage) { %>
-                                            <span class="conversation-time">
-                                                <%= new Date(lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %>
-                                            </span>
-                                        <% } %>
-                                    </div>
-                                    <div class="conversation-preview">
-                                        <% if (lastMessage) { %>
-                                            <% if (lastMessage.sender._id.equals(user._id)) { %>
-                                                <span>You: </span>
-                                            <% } %>
-                                            <%= lastMessage.text ? lastMessage.text.substring(0, 30) : '[Media]' %>
-                                        <% } else { %>
-                                            <span>Start a new conversation</span>
-                                        <% } %>
-                                    </div>
-                                </div>
-                            </a>
-                        <% }); %>
-                    <% } else { %>
-                        <div class="empty-state">
-                            <p>No conversations yet</p>
-                            <a href="/profile" class="btn">Find friends to chat with</a>
-                        </div>
-                    <% } %>
-                </div>
-
-                <!-- Group chat section -->
-                <div class="group-chat-section">
-                    <a href="/chat" class="group-chat-btn">
-                        <i class="fas fa-users"></i> Group Chat
-                    </a>
-                </div>
-            </aside>
-
-            <!-- Status Tab -->
-            <section class="tab-content" id="status">
-                <div class="status-section">
-                    <h3>Status Updates</h3>
-                    <p>Here you can view and add status updates (feature to be added).</p>
-                </div>
-            </section>
-
-            <!-- Calls Tab -->
-            <section class="tab-content" id="calls">
-                <div class="calls-section">
-                    <h3>Recent Calls</h3>
-                    <p>No calls yet. Start a new call soon!</p>
-                </div>
-            </section>
-
-            <!-- Main Content -->
-            <main class="main-content">
-                <div class="welcome-section">
-                    <div class="welcome-content">
-                        <h2>Welcome, <%= user.username %></h2>
-                        <p>Select a conversation or start a new one</p>
-
-                        <div class="group-chat-card">
-                            <h3>Public Group Chat</h3>
-                            <p>Chat with everyone in the BBWhatsApp community</p>
-                            <a href="/chat" class="btn">Join Group</a>
-                        </div>
-                    </div>
-
-                    <div class="recent-messages">
-                        <h3>Recent Group Messages</h3>
-                        <% if (groupMessages.length > 0) { %>
-                            <div class="messages-list">
-                                <% groupMessages.forEach(msg => { %>
-                                    <% if (msg.sender) { %>
-                                        <div class="message-preview">
-                                            <img src="<%= msg.sender.getProfileImage() %>" alt="<%= msg.sender.username %>" class="profile-img-xs">
-                                            <div class="message-content">
-                                                <span class="sender-name"><%= msg.sender.username %></span>
-                                                <p class="message-text">
-                                                    <%= msg.text ? msg.text.substring(0, 50) : (msg.media ? '[Media]' : '[Message]') %>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    <% } %>
-                                <% }); %>
-                            </div>
-                        <% } else { %>
-                            <p>No recent messages in the group</p>
-                        <% } %>
-                    </div>
-                </div>
-            </main>
-        </div>
+      <h4>Groups</h4>
+      <ul id="groups">
+        <% if (groups && groups.length > 0) { %>
+          <% groups.forEach(function(g){ %>
+            <li><button onclick="joinRoom('<%= g %>')">Join <%= g %></button></li>
+          <% }) %>
+        <% } else { %>
+          <li>No groups available</li>
+        <% } %>
+      </ul>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const socket = io();
+    <!-- Chat section -->
+    <div id="chat">
+      <div id="chat-header">Global Chat</div>
+      <div id="messages">
+        <% if (messages && messages.length > 0) { %>
+          <% messages.forEach(function(m){ %>
+            <div class="msg <%= m.username === user ? 'me' : '' %>">
+              [<%= new Date(m.timestamp).toLocaleTimeString() %>] 
+              <strong><%= m.username %>:</strong> <%= m.text %>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <p class="system">No messages yet...</p>
+        <% } %>
+      </div>
 
-            // Join user's personal room
-            socket.emit('join', '<%= user._id %>');
+      <form id="form">
+        <input id="input" autocomplete="off" placeholder="Type a message..."/>
+        <button>Send</button>
+      </form>
+    </div>
+  </div>
 
-            // Handle user status
-            socket.on('userStatus', (data) => {
-                console.log(`User ${data.userId} is ${data.isOnline ? 'online' : 'offline'}`);
-            });
+  <script>
+    const socket = io();
+    let currentChat = "global"; // default chat target
+    let privateTo = null;
 
-            // New message notification
-            socket.on('newMessageNotification', (data) => {
-                console.log('New message notification:', data);
-            });
+    // username comes from server-side
+    const username = "<%= user %>";
+    socket.emit("join", username);
 
-            // Real-time messages
-            socket.on('message', (message) => {
-                console.log('New message received:', message);
-            });
+    // DOM elements
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+    const usersList = document.getElementById('users');
+    const chatHeader = document.getElementById('chat-header');
 
-            // Tab switching
-            const tabButtons = document.querySelectorAll('.tab-btn');
-            const tabContents = document.querySelectorAll('.tab-content');
+    // Add message
+    function addMessage(msg) {
+      const item = document.createElement('div');
+      item.classList.add('msg');
+      if (msg.username === 'System') {
+        item.classList.add('system');
+      } else if (msg.username === username) {
+        item.classList.add('me');
+      }
+      item.textContent = `[${new Date(msg.timestamp).toLocaleTimeString()}] ${msg.username}: ${msg.text}`;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-            tabButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    tabButtons.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
+    // Socket events
+    socket.on('message', addMessage);
 
-                    const target = btn.getAttribute('data-tab');
-                    tabContents.forEach(c => c.classList.remove('active'));
-                    document.getElementById(target).classList.add('active');
-                });
-            });
+    socket.on('users', (users) => {
+      usersList.innerHTML = '';
+      users.forEach(u => {
+        if (u !== username) {
+          const li = document.createElement('li');
+          li.textContent = u;
+          li.classList.add('user-item');
+          li.onclick = () => {
+            currentChat = "private";
+            privateTo = u;
+            chatHeader.textContent = "Chat with " + u;
+            messages.innerHTML = '';
+          };
+          usersList.appendChild(li);
+        }
+      });
+    });
+
+    socket.on('privateMessage', (msg) => {
+      if (msg.from === privateTo || msg.to === username) {
+        addMessage({
+          username: msg.from,
+          text: msg.text,
+          timestamp: msg.timestamp
         });
-    </script>
+      }
+    });
+
+    // Form submit
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input.value) {
+        if (currentChat === "global") {
+          socket.emit('chatMessage', { username, text: input.value });
+        } else if (currentChat === "private" && privateTo) {
+          socket.emit('privateMessage', { to: privateTo, text: input.value });
+        }
+        input.value = '';
+      }
+    });
+
+    // Join group
+    function joinRoom(room) {
+      currentChat = "group";
+      privateTo = room;
+      chatHeader.textContent = "Group: " + room;
+      messages.innerHTML = '';
+      socket.emit('joinRoom', room);
+    }
+  </script>
 </body>
 </html>
