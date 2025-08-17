@@ -1,582 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title><%= title %></title>
-
-<!-- Embedded WhatsApp-like styles (self-contained) -->
-<style>
-  :root{
-    --bg:#e5ddd5;
-    --panel:#ffffff;
-    --accent:#25D366;
-    --accent-dark:#128C7E;
-    --muted:#9aa3a6;
-    --bubble-me:#dcf8c6;
-    --bubble-other:#ffffff;
-    --max-width:1100px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  }
-  html,body{height:100%;margin:0;background:var(--bg);color:#111}
-  .wrap{max-width:var(--max-width);height:100vh;margin:0 auto;display:grid;grid-template-columns:320px 1fr;box-shadow:0 6px 20px rgba(0,0,0,0.06);background:transparent}
-  /* SIDEBAR */
-  .sidebar{background:var(--panel);border-right:1px solid #ddd;display:flex;flex-direction:column}
-  .sidebar-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eee}
-  .brand{display:flex;align-items:center;gap:12px}
-  .brand .logo{width:36px;height:36px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
-  .search{padding:10px;border-bottom:1px solid #f0f0f0}
-  .search input{width:100%;padding:10px;border-radius:20px;border:1px solid #eee;background:#fafafa}
-  .contacts{overflow:auto;flex:1}
-  .contact{display:flex;align-items:center;padding:10px 12px;gap:10px;cursor:pointer;border-bottom:1px solid #f5f5f5}
-  .contact:hover{background:#fafafa}
-  .avatar{width:44px;height:44px;border-radius:50%;object-fit:cover}
-  .contact .meta{flex:1}
-  .contact .name{font-weight:600}
-  .contact .preview{font-size:13px;color:var(--muted);margin-top:3px}
-  .status-dot{width:10px;height:10px;border-radius:50%;margin-left:6px}
-  .status-dot.online{background:#34d859}
-  .status-dot.offline{background:#cfcfcf}
-
-  /* CHAT PANEL */
-  .panel{display:flex;flex-direction:column;background:linear-gradient(#f9f9f9,#f2f2f2)}
-  .header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);border-bottom:1px solid #eee}
-  .header .partner{display:flex;align-items:center;gap:12px}
-  .partner .avatar-sm{width:44px;height:44px;border-radius:50%;object-fit:cover}
-  .partner .info .name{font-weight:700}
-  .partner .info .status{font-size:13px;color:var(--muted)}
-  .header .actions{margin-left:auto;display:flex;gap:12px;align-items:center}
-  .header button{background:transparent;border:none;cursor:pointer;font-size:18px}
-
-  .messages{flex:1;overflow:auto;padding:18px;background:var(--bg)}
-  .date-divider{display:flex;align-items:center;justify-content:center;margin:8px 0;color:var(--muted);font-size:12px}
-  .message-row{display:flex;align-items:flex-end;margin:8px 0;gap:10px}
-  .message-row.me{justify-content:flex-end}
-  .bubble{max-width:70%;padding:10px 12px;border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,0.03);position:relative}
-  .bubble.me{background:var(--bubble-me);border-bottom-right-radius:4px}
-  .bubble.other{background:var(--bubble-other);border-bottom-left-radius:4px}
-  .bubble .text{white-space:pre-wrap}
-  .meta{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--muted)}
-  .meta .ticks{color:var(--muted);font-size:12px}
-  .reply-preview{border-left:3px solid #ddd;padding-left:8px;margin-bottom:6px;font-size:13px;color:var(--muted);background:rgba(0,0,0,0.02);padding:6px;border-radius:6px}
-
-  /* Input area */
-  .composer{display:flex;align-items:center;padding:10px 12px;border-top:1px solid #eee;background:var(--panel)}
-  .composer .left, .composer .right{display:flex;gap:8px;align-items:center}
-  .composer .input-wrap{flex:1;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:24px;background:#fff;border:1px solid #e9e9e9}
-  .composer input[type="text"]{flex:1;border:none;outline:none;padding:10px;font-size:15px;background:transparent}
-  .icon-btn{background:transparent;border:none;cursor:pointer;font-size:18px}
-
-  /* message action menu */
-  .action-menu{position:fixed;display:none;background:white;padding:8px;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.12);z-index:50}
-
-  /* media modal */
-  .media-modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:60}
-  .media-modal .card{background:white;padding:12px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto}
-
-  /* responsive */
-  @media (max-width:900px){
-    .wrap{grid-template-columns:1fr}
-    .sidebar{display:none}
-    .header .back-mobile{display:inline-block}
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>BBWhatsapp - Chat</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; }
+    #chat-container { display: flex; height: 100vh; }
+    #sidebar { width: 25%; background:#f0f0f0; border-right:1px solid #ccc; padding:10px; overflow-y:auto; }
+    #chat { flex: 1; display:flex; flex-direction: column; }
+    #chat-header { padding:10px; border-bottom:1px solid #ccc; background:#eee; font-weight:bold; }
+    #messages { flex:1; padding:10px; overflow-y:auto; }
+    #form { display:flex; border-top:1px solid #ccc; }
+    #form input { flex:1; padding:10px; border:none; }
+    #form button { padding:10px; border:none; background:#25d366; color:white; cursor:pointer; }
+    .msg { margin:5px 0; }
+    .system { color:gray; font-style:italic; }
+    .me { color:green; }
+    .user-item { cursor:pointer; padding:5px; }
+    .user-item:hover { background:#ddd; }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <!-- Sidebar: contacts -->
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-top">
-      <div class="brand">
-        <div class="logo">BB</div>
-        <div>
-          <div style="font-weight:700">BBWhatsApp</div>
-          <div style="font-size:12px;color:var(--muted)">chat</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="newChatBtn" title="New chat" class="icon-btn">＋</button>
-      </div>
-    </div>
-
-    <div class="search">
-      <input id="searchInput" placeholder="Search or start new chat" />
-    </div>
-
-    <div class="contacts" id="contacts">
-      <!-- Group top -->
-      <div class="contact" data-conversation-id="" data-user-id="" id="group-row">
-        <img class="avatar" src="/images/default-profile.png" alt="group"/>
-        <div class="meta">
-          <div class="name">BBWhatsApp Group</div>
-          <div class="preview">Group chat — everyone</div>
-        </div>
-        <div class="status-dot online" title="group"></div>
-      </div>
-
-      <!-- server-side rendered conversation preview + user list -->
-      <% if (typeof users !== 'undefined' && users && users.length) { %>
-        <% users.forEach(u => { if (u._id.toString() !== userId.toString()) { %>
-          <div class="contact" data-user-id="<%= u._id %>">
-            <img class="avatar" src="<%= u.profileImage || '/images/default-profile.png' %>" alt="<%= u.username %>">
-            <div class="meta">
-              <div class="name"><%= u.username %></div>
-              <div class="preview"><%= u.status ? u.status : (u.isOnline ? 'Online' : (u.lastSeen ? 'Last seen ' + new Date(u.lastSeen).toLocaleTimeString() : 'Offline')) %></div>
-            </div>
-            <div class="status-dot <%= u.isOnline ? 'online' : 'offline' %>"></div>
-          </div>
-        <% }}) } %>
-    </div>
-  </div>
-
-  <!-- Chat panel -->
-  <div class="panel">
-    <div class="header">
-      <div class="partner">
-        <img id="partnerAvatar" class="avatar-sm" src="<%= isGroup ? '/images/default-profile.png' : (otherUser ? otherUser.profileImage : '/images/default-profile.png') %>" alt="partner">
-        <div class="info">
-          <div class="name" id="partnerName"><%= isGroup ? 'BBWhatsApp Group' : (otherUser ? otherUser.username : 'Chat') %></div>
-          <div class="status" id="partnerStatus"><%= isGroup ? 'Everyone' : (otherUser && otherUser.status ? otherUser.status : (otherUser && otherUser.lastSeen ? 'Last seen ' + new Date(otherUser.lastSeen).toLocaleTimeString() : (otherUser && otherUser.isOnline ? 'Online' : 'Offline'))) %></div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button id="searchBtn" class="icon-btn">🔎</button>
-        <button id="moreBtn" class="icon-btn">⋯</button>
-      </div>
-    </div>
-
-    <div class="messages" id="chat-messages" aria-live="polite">
-      <!-- server-rendered initial messages (sanity-check, will be re-appended via socket) -->
-      <% messages.forEach(msg => { %>
-        <% if (msg.type === 'system') { %>
-          <div class="date-divider"><%= msg.text %></div>
-        <% } else { 
-          const senderId = msg.sender && msg.sender._id ? msg.sender._id.toString() : '';
-          const me = senderId === userId.toString();
-        %>
-          <div class="message-row <%= me ? 'me' : '' %>">
-            <% if (!me) { %>
-              <img class="avatar" src="<%= msg.sender ? msg.sender.profileImage : '/images/default-profile.png' %>" alt="user">
-            <% } %>
-            <div class="bubble <%= me ? 'me' : 'other' %>" data-id="<%= msg.id %>">
-              <% if (msg.replyTo) { %>
-                <div class="reply-preview">Reply: <%= msg.replyTo.text || 'Media' %></div>
-              <% } %>
-              <% if (msg.media) { %>
-                <% if (msg.media.type === 'image') { %>
-                  <div><img src="<%= msg.media.url %>" style="max-width:220px;border-radius:8px" /></div>
-                <% } else if (msg.media.type === 'video') { %>
-                  <div><video controls style="max-width:320px;border-radius:8px"><source src="<%= msg.media.url %>" type="video/mp4"></video></div>
-                <% } else if (msg.media.type === 'audio') { %>
-                  <div><audio controls><source src="<%= msg.media.url %>" type="audio/mpeg"></audio></div>
-                <% } %>
-              <% } %>
-              <% if (msg.text) { %>
-                <div class="text"><%= msg.text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>') %></div>
-              <% } %>
-
-              <div class="meta">
-                <span class="time"><%= new Date(msg.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) %></span>
-                <% if (me) { %>
-                  <span class="ticks"><% if (msg.read) { %>✔✔<% } else { %>✔<% } %></span>
-                <% } %>
-              </div>
-            </div>
-          </div>
+  <div id="chat-container">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <h3>Users</h3>
+      <ul id="users">
+        <% if (users && users.length > 0) { %>
+          <% users.forEach(function(u){ %>
+            <li class="user-item"><%= u %></li>
+          <% }) %>
         <% } %>
-      <% }) %>
+      </ul>
+
+      <h4>Groups</h4>
+      <ul id="groups">
+        <% if (groups && groups.length > 0) { %>
+          <% groups.forEach(function(g){ %>
+            <li><button onclick="joinRoom('<%= g %>')">Join <%= g %></button></li>
+          <% }) %>
+        <% } else { %>
+          <li>No groups available</li>
+        <% } %>
+      </ul>
     </div>
 
-    <div id="typing-indicator" style="padding:8px 14px;color:var(--muted);display:none">Someone is typing...</div>
+    <!-- Chat section -->
+    <div id="chat">
+      <div id="chat-header">Global Chat</div>
+      <div id="messages">
+        <% if (messages && messages.length > 0) { %>
+          <% messages.forEach(function(m){ %>
+            <div class="msg <%= m.username === user ? 'me' : '' %>">
+              [<%= new Date(m.timestamp).toLocaleTimeString() %>] 
+              <strong><%= m.username %>:</strong> <%= m.text %>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <p class="system">No messages yet...</p>
+        <% } %>
+      </div>
 
-    <div class="composer">
-      <div class="left">
-        <button id="emojiBtn" class="icon-btn" title="Emoji">😊</button>
-        <div class="input-wrap">
-          <input type="text" id="msg" placeholder="Type a message" autocomplete="off" />
-        </div>
-      </div>
-      <div class="right">
-        <input type="file" id="fileInput" style="display:none" accept="image/*,video/*,audio/*" />
-        <button id="attachBtn" class="icon-btn" title="Attach">📎</button>
-        <button id="sendBtn" class="icon-btn" title="Send">➡️</button>
-      </div>
+      <form id="form">
+        <input id="input" autocomplete="off" placeholder="Type a message..."/>
+        <button>Send</button>
+      </form>
     </div>
   </div>
-</div>
 
-<!-- media preview modal -->
-<div class="media-modal" id="mediaModal">
-  <div class="card">
-    <button id="closeMediaModal" style="float:right">✖</button>
-    <div id="mediaContainer"></div>
-  </div>
-</div>
+  <script>
+    const socket = io();
+    let currentChat = "global"; // default chat target
+    let privateTo = null;
 
-<!-- action menu simple -->
-<div class="action-menu" id="actionMenu">
-  <button id="replyBtn">Reply</button>
-  <button id="editBtn">Edit</button>
-  <button id="deleteBtn">Delete</button>
-</div>
+    // username comes from server-side
+    const username = "<%= user %>";
+    socket.emit("join", username);
 
-<!-- Socket.io -->
-<script src="/socket.io/socket.io.js"></script>
+    // DOM elements
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+    const usersList = document.getElementById('users');
+    const chatHeader = document.getElementById('chat-header');
 
-<script>
-(function(){
-  // Bootstrap data from server
-  const USER_ID = '<%= userId %>';
-  const USERNAME = '<%= username %>';
-  const CONVERSATION_ID = '<%= conversation ? conversation._id : "" %>';
-  const IS_GROUP = <%= isGroup ? 'true' : 'false' %>;
-
-  const socket = io();
-
-  // DOM elements
-  const contactsEl = document.getElementById('contacts');
-  const messagesEl = document.getElementById('chat-messages');
-  const msgInput = document.getElementById('msg');
-  const sendBtn = document.getElementById('sendBtn');
-  const attachBtn = document.getElementById('attachBtn');
-  const fileInput = document.getElementById('fileInput');
-  const typingIndicator = document.getElementById('typing-indicator');
-  const mediaModal = document.getElementById('mediaModal');
-  const mediaContainer = document.getElementById('mediaContainer');
-  const closeMediaModal = document.getElementById('closeMediaModal');
-  const actionMenu = document.getElementById('actionMenu');
-  const replyBtn = document.getElementById('replyBtn');
-  const editBtn = document.getElementById('editBtn');
-  const deleteBtn = document.getElementById('deleteBtn');
-
-  let replyingTo = null;
-  let editingMessageId = null;
-  let selectedMessageId = null;
-  let mediaFile = null;
-  let typingTimeout = null;
-
-  // join socket with user id
-  socket.emit('join', USER_ID);
-
-  // join conversation room if present
-  if (CONVERSATION_ID && CONVERSATION_ID !== '') {
-    socket.emit('joinConversation', CONVERSATION_ID);
-  } else {
-    // for group, join a 'group' room naming decision on backend: here backend uses message.type:'chat' and io.emit; joinConversation may not exist for group
-    // but to enable typing use conversationId 'group'
-    socket.emit('joinConversation', 'group');
-  }
-
-  // helper: escape HTML
-  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-  // append message to UI (message object structure matches server's populated Message)
-  function appendMessage(m) {
-    if (!m || m.type === 'system') {
-      if (m && m.text) {
-        const div = document.createElement('div');
-        div.className = 'date-divider';
-        div.textContent = m.text;
-        messagesEl.appendChild(div);
+    // Add message
+    function addMessage(msg) {
+      const item = document.createElement('div');
+      item.classList.add('msg');
+      if (msg.username === 'System') {
+        item.classList.add('system');
+      } else if (msg.username === username) {
+        item.classList.add('me');
       }
-      return;
+      item.textContent = `[${new Date(msg.timestamp).toLocaleTimeString()}] ${msg.username}: ${msg.text}`;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
     }
 
-    // avoid duplicate
-    if (messagesEl.querySelector(`.bubble[data-id="${m.id}"]`)) return;
+    // Socket events
+    socket.on('message', addMessage);
 
-    const me = m.sender && m.sender._id && (m.sender._id.toString() === USER_ID.toString());
-    const row = document.createElement('div');
-    row.className = 'message-row' + (me ? ' me' : '');
-    if (!me) {
-      const img = document.createElement('img');
-      img.className = 'avatar';
-      img.src = m.sender && m.sender.profileImage ? m.sender.profileImage : '/images/default-profile.png';
-      row.appendChild(img);
-    }
-
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble ' + (me ? 'me' : 'other');
-    bubble.dataset.id = m.id;
-
-    // reply preview
-    if (m.replyTo && m.replyTo.text) {
-      const rp = document.createElement('div');
-      rp.className = 'reply-preview';
-      rp.textContent = 'Reply: ' + m.replyTo.text;
-      bubble.appendChild(rp);
-    }
-
-    if (m.media) {
-      if (m.media.type === 'image') {
-        const img = document.createElement('img');
-        img.src = m.media.url;
-        img.style.maxWidth = '260px';
-        img.style.borderRadius = '8px';
-        img.style.cursor = 'pointer';
-        img.addEventListener('click', () => showMediaModal('image', m.media.url));
-        bubble.appendChild(img);
-      } else if (m.media.type === 'video') {
-        const vid = document.createElement('video');
-        vid.controls = true;
-        vid.style.maxWidth = '320px';
-        const src = document.createElement('source');
-        src.src = m.media.url;
-        src.type = 'video/mp4';
-        vid.appendChild(src);
-        bubble.appendChild(vid);
-      } else if (m.media.type === 'audio') {
-        const aud = document.createElement('audio');
-        aud.controls = true;
-        const s = document.createElement('source');
-        s.src = m.media.url;
-        s.type = 'audio/mpeg';
-        aud.appendChild(s);
-        bubble.appendChild(aud);
-      }
-    }
-
-    if (m.text) {
-      const t = document.createElement('div');
-      t.className = 'text';
-      // linkify
-      const html = esc(m.text).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-      t.innerHTML = html;
-      bubble.appendChild(t);
-    }
-
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    const time = document.createElement('span');
-    time.className = 'time';
-    time.textContent = new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    meta.appendChild(time);
-
-    if (me) {
-      const ticks = document.createElement('span');
-      ticks.className = 'ticks';
-      ticks.style.marginLeft='6px';
-      ticks.textContent = m.read ? '✔✔' : '✔';
-      meta.appendChild(ticks);
-    }
-    bubble.appendChild(meta);
-
-    // add event listeners for selecting (right click / long press)
-    bubble.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault();
-      selectMessage(bubble, ev.clientX, ev.clientY);
+    socket.on('users', (users) => {
+      usersList.innerHTML = '';
+      users.forEach(u => {
+        if (u !== username) {
+          const li = document.createElement('li');
+          li.textContent = u;
+          li.classList.add('user-item');
+          li.onclick = () => {
+            currentChat = "private";
+            privateTo = u;
+            chatHeader.textContent = "Chat with " + u;
+            messages.innerHTML = '';
+          };
+          usersList.appendChild(li);
+        }
+      });
     });
 
-    bubble.addEventListener('click', (ev) => {
-      // short tap deselects menu
-      hideActionMenu();
+    socket.on('privateMessage', (msg) => {
+      if (msg.from === privateTo || msg.to === username) {
+        addMessage({
+          username: msg.from,
+          text: msg.text,
+          timestamp: msg.timestamp
+        });
+      }
     });
 
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  // show media modal
-  function showMediaModal(type, url) {
-    mediaContainer.innerHTML = '';
-    if (type === 'image') {
-      const img = document.createElement('img'); img.src = url; img.style.maxWidth='90vw'; mediaContainer.appendChild(img);
-    } else if (type === 'video') {
-      const v = document.createElement('video'); v.controls = true; v.style.maxWidth='90vw'; const s=document.createElement('source'); s.src=url; s.type='video/mp4'; v.appendChild(s); mediaContainer.appendChild(v);
-    } else if (type === 'audio') {
-      const a = document.createElement('audio'); a.controls=true; const s=document.createElement('source'); s.src=url; s.type='audio/mpeg'; a.appendChild(s); mediaContainer.appendChild(a);
-    }
-    mediaModal.style.display = 'flex';
-  }
-  closeMediaModal.addEventListener('click', () => mediaModal.style.display='none');
-
-  // select message
-  function selectMessage(el, x, y) {
-    selectedMessageId = el.dataset.id;
-    // highlight
-    document.querySelectorAll('.bubble').forEach(b=>b.style.boxShadow='none');
-    el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-    // show action menu near coordinates
-    actionMenu.style.left = (x - 60) + 'px';
-    actionMenu.style.top = (y - 10) + 'px';
-    actionMenu.style.display = 'block';
-  }
-  function hideActionMenu() {
-    actionMenu.style.display = 'none';
-    selectedMessageId = null;
-    document.querySelectorAll('.bubble').forEach(b=>b.style.boxShadow='none');
-  }
-
-  // reply/edit/delete handlers
-  replyBtn.addEventListener('click', () => {
-    const bubble = document.querySelector(`.bubble[data-id="${selectedMessageId}"]`);
-    if (!bubble) return hideActionMenu();
-    const text = bubble.querySelector('.text') ? bubble.querySelector('.text').textContent : '[Media]';
-    replyingTo = { id: selectedMessageId, text };
-    msgInput.focus();
-    hideActionMenu();
-  });
-
-  editBtn.addEventListener('click', () => {
-    // allow editing only for own message
-    const bubble = document.querySelector(`.bubble[data-id="${selectedMessageId}"]`);
-    if (!bubble) return hideActionMenu();
-    const isMine = bubble.closest('.message-row').classList.contains('me');
-    if (!isMine) { alert('Can only edit your messages'); hideActionMenu(); return; }
-    const text = bubble.querySelector('.text') ? bubble.querySelector('.text').textContent : '';
-    editingMessageId = selectedMessageId;
-    msgInput.value = text;
-    msgInput.focus();
-    hideActionMenu();
-  });
-
-  deleteBtn.addEventListener('click', () => {
-    if (!selectedMessageId) return hideActionMenu();
-    if (!confirm('Delete this message for everyone?')) { hideActionMenu(); return; }
-    socket.emit('deleteMessage', { messageId: selectedMessageId });
-    hideActionMenu();
-  });
-
-  // typing indicator local
-  msgInput.addEventListener('input', () => {
-    socket.emit('typing', { conversationId: CONVERSATION_ID || 'group', isTyping: true });
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(()=> socket.emit('typing', { conversationId: CONVERSATION_ID || 'group', isTyping: false }), 1500);
-  });
-
-  // attach file
-  attachBtn.addEventListener('click', ()=> fileInput.click());
-  fileInput.addEventListener('change', async (e)=>{
-    const file = e.target.files[0];
-    if (!file) return;
-    // show tiny preview in composer
-    mediaFile = file;
-    // not auto-sent — will be uploaded when user clicks send
-    const preview = document.createElement('div'); preview.textContent = 'Attached: ' + file.name; preview.style.fontSize='12px'; preview.style.color='var(--muted)';
-    // insert preview in composer (simple)
-    const wrap = document.querySelector('.input-wrap'); wrap.appendChild(preview);
-  });
-
-  // send message
-  sendBtn.addEventListener('click', onSend);
-  msgInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } });
-
-  async function onSend(){
-    const text = msgInput.value.trim();
-    // if editing
-    if (editingMessageId) {
-      const newText = msgInput.value.trim();
-      if (!newText) { alert('Message cannot be empty'); return; }
-      socket.emit('editMessage', { messageId: editingMessageId, newText });
-      editingMessageId = null;
-      msgInput.value = '';
-      return;
-    }
-
-    if (!text && !mediaFile) return;
-    let mediaData = null;
-    if (mediaFile) {
-      // upload via /upload endpoint
-      try {
-        const fd = new FormData();
-        fd.append('media', mediaFile);
-        const res = await fetch('/upload', { method:'POST', body: fd });
-        const json = await res.json();
-        mediaData = { type: json.type, url: json.url, name: mediaFile.name, size: mediaFile.size };
-      } catch (err) {
-        console.error('Upload error', err);
-        alert('Upload failed');
-        return;
+    // Form submit
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input.value) {
+        if (currentChat === "global") {
+          socket.emit('chatMessage', { username, text: input.value });
+        } else if (currentChat === "private" && privateTo) {
+          socket.emit('privateMessage', { to: privateTo, text: input.value });
+        }
+        input.value = '';
       }
+    });
+
+    // Join group
+    function joinRoom(room) {
+      currentChat = "group";
+      privateTo = room;
+      chatHeader.textContent = "Group: " + room;
+      messages.innerHTML = '';
+      socket.emit('joinRoom', room);
     }
-
-    const payload = { text: text || '', media: mediaData, replyTo: replyingTo || null };
-    if (CONVERSATION_ID && CONVERSATION_ID !== '') payload.conversationId = CONVERSATION_ID;
-    socket.emit('chatMessage', payload);
-
-    // clear composer
-    msgInput.value = '';
-    replyingTo = null;
-    mediaFile = null;
-    // remove preview if any
-    const p = document.querySelector('.input-wrap div'); if (p) p.remove();
-  }
-
-  // socket events
-  socket.on('message', (m) => { appendMessage(m); });
-  socket.on('messageHistory', (msgs) => { msgs.forEach(m => appendMessage(m)); messagesEl.scrollTop = messagesEl.scrollHeight; });
-  socket.on('messageUpdated', (m) => {
-    // find bubble and update
-    const b = document.querySelector(`.bubble[data-id="${m.id}"]`);
-    if (!b) return;
-    if (m.deleted) {
-      b.innerHTML = '<div class="text">This message was deleted</div>';
-      return;
-    }
-    if (m.edited) {
-      // update text
-    }
-    if (m.text) {
-      const t = b.querySelector('.text');
-      if (t) t.innerHTML = esc(m.text).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-    }
-    // update ticks for own messages
-    const timeEl = b.querySelector('.time');
-    if (timeEl) timeEl.textContent = new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    if (b.closest('.message-row').classList.contains('me')) {
-      const ticks = b.querySelector('.ticks');
-      if (ticks) ticks.textContent = m.read ? '✔✔' : '✔';
-    }
-  });
-
-  socket.on('typing', (data) => {
-    if (data.userId === USER_ID) return;
-    // show typing if someone else typing in same conversation
-    typingIndicator.style.display = 'block';
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(()=> typingIndicator.style.display='none', 1400);
-  });
-
-  socket.on('userStatus', (d) => {
-    const partnerStatus = document.getElementById('partnerStatus');
-    if (d && d.userId && partnerStatus) {
-      // if otherUser and matches, update
-      partnerStatus.textContent = d.isOnline ? 'Online' : ('Last seen ' + (d.lastSeen ? new Date(d.lastSeen).toLocaleTimeString() : 'offline'));
-    }
-  });
-
-  socket.on('newMessageNotification', (n) => {
-    // play small highlight or update sidebar preview
-    // For simplicity: show browser notification if allowed
-    if (Notification && Notification.permission === 'granted') {
-      new Notification('New message', { body: n.message.text || 'Media', icon: '/images/default-profile.png' });
-    }
-  });
-
-  // click contact -> open private chat via navigating to new route (server handles or create conversation)
-  contactsEl.addEventListener('click', (e) => {
-    const contact = e.target.closest('.contact');
-    if (!contact) return;
-    const otherUserId = contact.dataset.userId;
-    if (!otherUserId) {
-      // group
-      window.location.href = '/chat?user=' + encodeURIComponent(USERNAME);
-      return;
-    }
-    window.location.href = '/chat/' + otherUserId + '?user=' + encodeURIComponent(USERNAME);
-  });
-
-  // allow dismissing action menu when clicking elsewhere
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.action-menu')) hideActionMenu();
-  });
-
-  // request notification permission
-  if (Notification && Notification.permission !== 'granted') Notification.requestPermission().catch(()=>{});
-
-})(); // end IIFE
-</script>
+  </script>
 </body>
 </html>
