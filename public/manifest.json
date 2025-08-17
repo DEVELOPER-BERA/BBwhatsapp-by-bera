@@ -1,0 +1,21 @@
+{
+  "name": "BBWhatsApp",
+  "short_name": "BBWA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b141a",
+  "theme_color": "#128c7e",
+  "description": "A WhatsApp-like chat application with private messaging",
+  "icons": [
+    {
+      "src": "/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
