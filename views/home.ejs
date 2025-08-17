@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1><i class="fas fa-comment-dots"></i> BBWhatsApp</h1>
+            <div class="header-actions">
+                <a href="/profile" class="profile-btn">
+                    <img src="<%= user.getProfileImage() %>" alt="Profile" class="profile-img-sm">
+                </a>
+                <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+        </header>
+        
+        <div class="app-content">
+            <aside class="sidebar">
+                <div class="search-container">
+                    <input type="text" placeholder="Search..." class="search-input">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                
+                <div class="sidebar-menu">
+                    <a href="/home" class="menu-item active">
+                        <i class="fas fa-comments"></i> Chats
+                    </a>
+                    <a href="/profile" class="menu-item">
+                        <i class="fas fa-user"></i> Profile
+                    </a>
+                </div>
+                
+                <div class="conversations-list">
+                    <div class="list-header">
+                        <h3>Recent Chats</h3>
+                    </div>
+                    
+                    <% if (conversations.length > 0) { %>
+                        <% conversations.forEach(conv => { 
+                            const otherUser = conv.participants.find(p => !p._id.equals(user._id));
+                            const lastMessage = conv.messages[0];
+                        %>
+                            <a href="/chat/<%= conv._id %>" class="conversation-item">
+                                <img src="<%= otherUser?.getProfileImage() %>" 
+                                     alt="<%= otherUser?.username || 'User' %>" 
+                                     class="profile-img-sm">
+                                <div class="conversation-details">
+                                    <div class="conversation-header">
+                                        <span class="conversation-name"><%= otherUser?.username || 'Unknown User' %></span>
+                                        <% if (lastMessage) { %>
+                                            <span class="conversation-time">
+                                                <%= new Date(lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %>
+                                            </span>
+                                        <% } %>
+                                    </div>
+                                    <div class="conversation-preview">
+                                        <% if (lastMessage) { %>
+                                            <% if (lastMessage.sender._id.equals(user._id)) { %>
+                                                <span>You: </span>
+                                            <% } %>
+                                            <%= lastMessage.text ? lastMessage.text.substring(0, 30) : '[Media]' %>
+                                        <% } else { %>
+                                            <span>Start a new conversation</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </a>
+                        <% }); %>
+                    <% } else { %>
+                        <div class="empty-state">
+                            <p>No conversations yet</p>
+                            <a href="/profile" class="btn">Find friends to chat with</a>
+                        </div>
+                    <% } %>
+                </div>
+                
+                <div class="group-chat-section">
+                    <a href="/chat" class="group-chat-btn">
+                        <i class="fas fa-users"></i> Group Chat
+                    </a>
+                </div>
+            </aside>
+            
+            <main class="main-content">
+                <div class="welcome-section">
+                    <div class="welcome-content">
+                        <h2>Welcome, <%= user.username %></h2>
+                        <p>Select a conversation or start a new one</p>
+                        
+                        <div class="group-chat-card">
+                            <h3>Public Group Chat</h3>
+                            <p>Chat with everyone in the BBWhatsApp community</p>
+                            <a href="/chat" class="btn">Join Group</a>
+                        </div>
+                    </div>
+                    
+                    <div class="recent-messages">
+                        <h3>Recent Group Messages</h3>
+                        <% if (groupMessages.length > 0) { %>
+                            <div class="messages-list">
+                                <% groupMessages.forEach(msg => { %>
+                                    <% if (msg.sender) { %>
+                                        <div class="message-preview">
+                                            <img src="<%= msg.sender.getProfileImage() %>" 
+                                                 alt="<%= msg.sender.username %>" 
+                                                 class="profile-img-xs">
+                                            <div class="message-content">
+                                                <span class="sender-name"><%= msg.sender.username %></span>
+                                                <p class="message-text">
+                                                    <%= msg.text ? msg.text.substring(0, 50) : (msg.media ? '[Media]' : '[Message]') %>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    <% } %>
+                                <% }); %>
+                            </div>
+                        <% } else { %>
+                            <p>No recent messages in the group</p>
+                        <% } %>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            
+            // Join user's personal room
+            socket.emit('join', '<%= user._id %>');
+            
+            // Handle user status updates
+            socket.on('userStatus', (data) => {
+                console.log(`User ${data.userId} is ${data.isOnline ? 'online' : 'offline'}`);
+                // Update UI to show user online/offline status
+            });
+            
+            // Handle new message notifications
+            socket.on('newMessageNotification', (data) => {
+                console.log('New message notification:', data);
+                // Show notification for new message
+            });
+            
+            // Handle new messages in real-time
+            socket.on('message', (message) => {
+                // Update UI with new message
+                console.log('New message received:', message);
+                // You might want to refresh the messages list or append the new message
+            });
+        });
+    </script>
+</body>
+</html>

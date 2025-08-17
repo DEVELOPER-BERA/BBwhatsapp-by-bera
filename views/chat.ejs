@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/chat.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <a href="/home" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+            <% if (isGroup) { %>
+                <h1><i class="fas fa-users"></i> BBWhatsApp Group</h1>
+            <% } else { %>
+                <div class="chat-partner-info">
+                    <img src="<%= otherUser.profileImage %>" alt="<%= otherUser.username %>" class="profile-img-sm">
+                    <div>
+                        <h2><%= otherUser.username %></h2>
+                        <p class="user-status">
+                            <% if (otherUser.status) { %>
+                                <%= otherUser.status %>
+                            <% } else { %>
+                                <span id="user-status"><%= otherUser.lastSeen ? 'Last seen ' + new Date(otherUser.lastSeen).toLocaleString() : 'Online' %></span>
+                            <% } %>
+                        </p>
+                    </div>
+                </div>
+            <% } %>
+            <a href="/profile/<%= isGroup ? '' : otherUser._id %>" class="profile-btn">
+                <i class="fas fa-info-circle"></i>
+            </a>
+        </header>
+        
+        <div class="chat-messages" id="chat-messages">
+            <% messages.forEach(msg => { %>
+                <% if(msg.type === 'system') { %>
+                    <div class="system-message" data-id="<%= msg.id %>">
+                        <span><%= msg.text %></span>
+                    </div>
+                <% } else { %>
+                    <% 
+                    // Add safety checks for message sender
+                    const senderId = msg.sender && msg.sender._id ? msg.sender._id.toString() : '';
+                    const isOwnMessage = senderId === userId;
+                    const senderProfileImage = msg.sender && msg.sender.profileImage ? msg.sender.profileImage : '/images/default-profile.png';
+                    const senderUsername = msg.sender && msg.sender.username ? msg.sender.username : 'Unknown';
+                    %>
+                    <div class="message <%= isOwnMessage ? 'own-message' : 'received-message' %>" data-id="<%= msg.id %>">
+                        <% if(!isOwnMessage) { %>
+                            <img src="<%= senderProfileImage %>" alt="<%= senderUsername %>" class="profile-img-xs">
+                        <% } %>
+                        
+                        <div class="message-content">
+                            <% if(!isOwnMessage) { %>
+                                <span class="sender-name"><%= senderUsername %></span>
+                            <% } %>
+                            
+                            <% if (msg.replyTo) { %>
+                                <div class="reply-preview">
+                                    <% 
+                                    const replyToSenderId = msg.replyTo.senderId ? msg.replyTo.senderId.toString() : '';
+                                    const replyToName = replyToSenderId === userId ? 'you' : senderUsername;
+                                    %>
+                                    <p class="reply-preview-meta">Replying to <%= replyToName %></p>
+                                    <p class="reply-preview-text <%= !msg.replyTo.text ? 'reply-preview-media' : '' %>">
+                                        <%= msg.replyTo.text || 'Media file' %>
+                                    </p>
+                                </div>
+                            <% } %>
+                            
+                            <% if (msg.media) { %>
+                                <div class="media-container">
+                                    <% if (msg.media.type === 'image') { %>
+                                        <img src="<%= msg.media.url %>" class="media-thumbnail" alt="Shared image">
+                                    <% } else if (msg.media.type === 'video') { %>
+                                        <video class="media-thumbnail" <%= msg.media.thumbnail ? `poster="${msg.media.thumbnail}"` : '' %> controls>
+                                            <source src="<%= msg.media.url %>" type="video/mp4">
+                                        </video>
+                                    <% } else if (msg.media.type === 'audio') { %>
+                                        <audio class="media-thumbnail" controls>
+                                            <source src="<%= msg.media.url %>" type="audio/mpeg">
+                                        </audio>
+                                    <% } %>
+                                </div>
+                            <% } %>
+                            
+                            <% if (msg.text) { %>
+                                <p class="text"><%= msg.text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>') %></p>
+                            <% } %>
+                            
+                            <div class="message-meta">
+                                <span class="time"><%= new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %></span>
+                                <% if (isOwnMessage) { %>
+                                    <span class="status">
+                                        <span class="status-tick"><i class="fas fa-check"></i></span>
+                                        <% if (msg.read) { %>
+                                            <span class="status-tick"><i class="fas fa-check"></i></span>
+                                        <% } %>
+                                    </span>
+                                <% } %>
+                                <% if (msg.edited) { %>
+                                    <span class="edited-indicator">(edited)</span>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+            <% }); %>
+        </div>
+        
+        <!-- Rest of your HTML remains the same -->
+        <div class="typing-indicator" id="typing-indicator"></div>
+        
+        <div class="reply-preview-container" id="reply-preview">
+            <div class="reply-preview-content">
+                <p class="reply-preview-meta"></p>
+                <p class="reply-preview-text"></p>
+            </div>
+            <button class="cancel-reply-btn"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div class="chat-form-container">
+            <form id="chat-form">
+                <div class="media-upload-container">
+                    <input type="file" id="media-upload" accept="image/*,video/*,audio/*" style="display: none;">
+                    <button type="button" id="media-btn" class="media-btn"><i class="fas fa-paperclip"></i></button>
+                </div>
+                <input type="text" id="msg" placeholder="Type your message..." autocomplete="off">
+                <button type="submit" class="btn"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+        
+        <div class="edit-message-container" id="edit-message-container">
+            <form id="edit-message-form">
+                <input type="text" id="edit-msg" required>
+                <button type="submit" class="btn"><i class="fas fa-check"></i></button>
+                <button type="button" class="cancel-edit-btn"><i class="fas fa-times"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Message Action Menu -->
+    <div class="message-action-menu" id="message-action-menu">
+        <button class="menu-btn" id="reply-menu-btn"><i class="fas fa-reply"></i></button>
+        <button class="menu-btn" id="react-menu-btn"><i class="fas fa-smile"></i></button>
+        <button class="menu-btn" id="copy-menu-btn"><i class="fas fa-copy"></i></button>
+        <button class="menu-btn" id="star-menu-btn"><i class="fas fa-star"></i></button>
+        <button class="menu-btn" id="delete-menu-btn"><i class="fas fa-trash"></i></button>
+    </div>
+
+    <!-- Reaction Picker -->
+    <div class="reaction-picker" id="reaction-picker">
+        <div class="reaction-options">
+            <button class="reaction-option" data-icon="fas fa-heart"><i class="fas fa-heart"></i></button>
+            <button class="reaction-option" data-icon="fas fa-thumbs-up"><i class="fas fa-thumbs-up"></i></button>
+            <button class="reaction-option" data-icon="fas fa-laugh"><i class="fas fa-laugh"></i></button>
+            <button class="reaction-option" data-icon="fas fa-surprise"><i class="fas fa-surprise"></i></button>
+            <button class="reaction-option" data-icon="fas fa-sad-tear"><i class="fas fa-sad-tear"></i></button>
+            <button class="reaction-option" data-icon="fas fa-angry"><i class="fas fa-angry"></i></button>
+        </div>
+    </div>
+
+    <!-- Media Preview Modal -->
+    <div class="media-preview-modal" id="media-preview-modal">
+        <div class="media-preview-content">
+            <img id="preview-image" class="preview-media" style="display:none;">
+            <video id="preview-video" class="preview-media" controls style="display:none;"></video>
+            <audio id="preview-audio" class="preview-media" controls style="display:none;"></audio>
+            <button class="close-preview-btn"><i class="fas fa-times"></i></button>
+            <a id="download-media-btn" class="download-btn" download><i class="fas fa-download"></i></a>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const chatForm = document.getElementById('chat-form');
+            const chatMessages = document.getElementById('chat-messages');
+            const typingIndicator = document.getElementById('typing-indicator');
+            const replyPreview = document.getElementById('reply-preview');
+            const editContainer = document.getElementById('edit-message-container');
+            const mediaUpload = document.getElementById('media-upload');
+            const mediaBtn = document.getElementById('media-btn');
+            const messageActionMenu = document.getElementById('message-action-menu');
+            const reactionPicker = document.getElementById('reaction-picker');
+            const mediaPreviewModal = document.getElementById('media-preview-modal');
+            const previewImage = document.getElementById('preview-image');
+            const previewVideo = document.getElementById('preview-video');
+            const previewAudio = document.getElementById('preview-audio');
+            const downloadBtn = document.getElementById('download-media-btn');
+            
+            const userId = '<%= userId %>';
+            const conversationId = '<%= conversation ? conversation._id : "" %>';
+            const isGroup = <%= isGroup %>;
+            let replyingTo = null;
+            let editingMessageId = null;
+            let selectedMessageId = null;
+            let typingTimeout;
+            let mediaFile = null;
+            let isConnected = false;
+
+            // Join conversation
+            if (conversationId) {
+                socket.emit('joinConversation', conversationId);
+            } else if (isGroup) {
+                socket.emit('join', userId);
+            }
+
+            // System message handling
+            socket.on('systemMessage', (message) => {
+                const div = document.createElement('div');
+                div.classList.add('system-message');
+                div.dataset.id = message.id;
+                div.innerHTML = `<span>${message.text}</span>`;
+                
+                chatMessages.appendChild(div);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                setTimeout(() => {
+                    div.style.opacity = '0';
+                    setTimeout(() => {
+                        div.remove();
+                    }, 500);
+                }, 5000);
+            });
+
+            // Message from server
+            socket.on('message', message => {
+                appendMessage(message);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+
+            // Message history from server
+            socket.on('messageHistory', messages => {
+                messages.forEach(message => {
+                    const existingMessage = document.querySelector(`.message[data-id="${message.id}"]`);
+                    if (!existingMessage) {
+                        appendMessage(message);
+                    }
+                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+
+            // Typing indicator
+            socket.on('typing', data => {
+                if (data.userId !== userId) {
+                    const userTyping = data.typingUsers.some(id => id === data.userId);
+                    if (userTyping) {
+                        const user = document.querySelector(`.message[data-id="${selectedMessageId}"] .sender-name`)?.textContent || 'Someone';
+                        typingIndicator.textContent = `${user} is typing...`;
+                        typingIndicator.style.display = 'block';
+                        
+                        clearTimeout(typingTimeout);
+                        typingTimeout = setTimeout(() => {
+                            typingIndicator.style.display = 'none';
+                        }, 2000);
+                    }
+                }
+            });
+
+            // Message update events
+            socket.on('messageUpdated', updatedMessage => {
+                const messageElement = document.querySelector(`.message[data-id="${updatedMessage.id}"]`);
+                if (messageElement) {
+                    if (updatedMessage.deleted) {
+                        messageElement.innerHTML = `
+                            <p class="text deleted-message">This message was deleted</p>
+                        `;
+                    } else {
+                        const textElement = messageElement.querySelector('.text');
+                        if (textElement && updatedMessage.text) {
+                            textElement.innerHTML = updatedMessage.text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+                        }
+                        
+                        const editedIndicator = messageElement.querySelector('.edited-indicator');
+                        if (updatedMessage.edited) {
+                            if (!editedIndicator) {
+                                const indicator = document.createElement('span');
+                                indicator.classList.add('edited-indicator');
+                                indicator.textContent = '(edited)';
+                                messageElement.querySelector('.message-meta').appendChild(indicator);
+                            }
+                        } else if (editedIndicator) {
+                            editedIndicator.remove();
+                        }
+                        
+                        const statusTicks = messageElement.querySelector('.status');
+                        if (statusTicks) {
+                            statusTicks.innerHTML = '';
+                            if (updatedMessage.sender && updatedMessage.sender._id && updatedMessage.sender._id.toString() === userId) {
+                                statusTicks.innerHTML = '<span class="status-tick"><i class="fas fa-check"></i></span>';
+                                if (updatedMessage.read) {
+                                    statusTicks.innerHTML += '<span class="status-tick"><i class="fas fa-check"></i></span>';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // User status updates
+            socket.on('userStatus', data => {
+                if (!isGroup && data.userId === '<%= otherUser ? otherUser._id : "" %>') {
+                    const statusElement = document.getElementById('user-status');
+                    if (statusElement) {
+                        statusElement.textContent = data.isOnline ? 'Online' : `Last seen ${new Date(data.lastSeen).toLocaleString()}`;
+                    }
+                }
+            });
+
+            // Media upload handling
+            mediaBtn.addEventListener('click', () => {
+                mediaUpload.click();
+            });
+
+            mediaUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    mediaFile = file;
+                    const reader = new FileReader();
+                    
+                    reader.onload = (event) => {
+                        const preview = document.createElement('div');
+                        preview.className = 'media-preview';
+                        
+                        if (file.type.startsWith('image/')) {
+                            preview.innerHTML = `
+                                <img src="${event.target.result}" class="media-thumbnail">
+                                <button class="remove-media-btn"><i class="fas fa-times"></i></button>
+                            `;
+                        } else if (file.type.startsWith('video/')) {
+                            preview.innerHTML = `
+                                <video class="media-thumbnail" controls>
+                                    <source src="${event.target.result}" type="${file.type}">
+                                </video>
+                                <button class="remove-media-btn"><i class="fas fa-times"></i></button>
+                            `;
+                        } else if (file.type.startsWith('audio/')) {
+                            preview.innerHTML = `
+                                <audio class="media-thumbnail" controls>
+                                    <source src="${event.target.result}" type="${file.type}">
+                                </audio>
+                                <button class="remove-media-btn"><i class="fas fa-times"></i></button>
+                            `;
+                        }
+                        
+                        const chatFormContainer = document.querySelector('.chat-form-container');
+                        const existingPreview = document.querySelector('.media-preview');
+                        if (existingPreview) {
+                            chatFormContainer.replaceChild(preview, existingPreview);
+                        } else {
+                            chatFormContainer.insertBefore(preview, chatFormContainer.firstChild);
+                        }
+                        
+                        preview.querySelector('.remove-media-btn').addEventListener('click', () => {
+                            preview.remove();
+                            mediaFile = null;
+                            mediaUpload.value = '';
+                        });
+                    };
+                    
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Message submit
+            chatForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const msgInput = e.target.elements.msg;
+                const msgText = msgInput.value.trim();
+                
+                if (!msgText && !mediaFile) return;
+                
+                let mediaData = null;
+                
+                if (mediaFile) {
+                    mediaData = {
+                        type: mediaFile.type.startsWith('image/') ? 'image' : 
+                              mediaFile.type.startsWith('video/') ? 'video' : 'audio',
+                        url: await getMediaData(mediaFile),
+                        name: mediaFile.name,
+                        size: mediaFile.size
+                    };
+                }
+                
+                const messageData = { 
+                    text: msgText,
+                    media: mediaData,
+                    replyTo: replyingTo
+                };
+                
+                if (conversationId) {
+                    messageData.conversationId = conversationId;
+                }
+                
+                socket.emit('chatMessage', messageData);
+                
+                // Clear input and media
+                msgInput.value = '';
+                mediaFile = null;
+                mediaUpload.value = '';
+                document.querySelector('.media-preview')?.remove();
+                hideReplyPreview();
+                msgInput.focus();
+            });
+
+            // Typing detection
+            document.getElementById('msg').addEventListener('input', () => {
+                socket.emit('typing', { 
+                    conversationId: conversationId || 'group',
+                    isTyping: true 
+                });
+                
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.emit('typing', { 
+                        conversationId: conversationId || 'group',
+                        isTyping: false 
+                    });
+                }, 2000);
+            });
+
+            // Edit message form
+            document.getElementById('edit-message-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const newText = document.getElementById('edit-msg').value.trim();
+                if (newText && editingMessageId) {
+                    socket.emit('editMessage', {
+                        messageId: editingMessageId,
+                        newText: newText
+                    });
+                    editContainer.style.display = 'none';
+                    document.getElementById('msg').focus();
+                }
+            });
+
+            // Cancel edit
+            document.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+                editContainer.style.display = 'none';
+                document.getElementById('msg').focus();
+            });
+
+            // Cancel reply
+            document.querySelector('.cancel-reply-btn').addEventListener('click', () => {
+                hideReplyPreview();
+            });
+
+            // Close media preview
+            document.querySelector('.close-preview-btn').addEventListener('click', () => {
+                mediaPreviewModal.style.display = 'none';
+                previewImage.style.display = 'none';
+                previewVideo.style.display = 'none';
+                previewAudio.style.display = 'none';
+            });
+
+            // Message action menu buttons
+            document.getElementById('reply-menu-btn').addEventListener('click', () => {
+                const messageElement = document.querySelector(`.message[data-id="${selectedMessageId}"]`);
+                if (messageElement) {
+                    const messageUsername = messageElement.querySelector('.sender-name')?.textContent || 'You';
+                    const messageText = messageElement.querySelector('.text')?.textContent || '[Media]';
+                    const messageId = selectedMessageId;
+                    
+                    showReplyPreview(messageId, messageUsername, messageText);
+                    hideMessageActionMenu();
+                }
+            });
+
+            document.getElementById('react-menu-btn').addEventListener('click', () => {
+                const messageElement = document.querySelector(`.message[data-id="${selectedMessageId}"]`);
+                if (messageElement) {
+                    const rect = messageElement.getBoundingClientRect();
+                    showReactionPicker(rect.left + rect.width/2, rect.top - 50);
+                    hideMessageActionMenu();
+                }
+            });
+
+            document.getElementById('copy-menu-btn').addEventListener('click', () => {
+                const messageElement = document.querySelector(`.message[data-id="${selectedMessageId}"]`);
+                if (messageElement) {
+                    const text = messageElement.querySelector('.text')?.textContent || '';
+                    navigator.clipboard.writeText(text);
+                    hideMessageActionMenu();
+                }
+            });
+
+            document.getElementById('star-menu-btn').addEventListener('click', () => {
+                socket.emit('starMessage', { messageId: selectedMessageId });
+                hideMessageActionMenu();
+            });
+
+            document.getElementById('delete-menu-btn').addEventListener('click', () => {
+                if (confirm('Are you sure you want to delete this message?')) {
+                    socket.emit('deleteMessage', {
+                        messageId: selectedMessageId
+                    });
+                }
+                hideMessageActionMenu();
+            });
+
+            // Reaction picker options
+            document.querySelectorAll('.reaction-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    if (selectedMessageId) {
+                        socket.emit('reactToMessage', {
+                            messageId: selectedMessageId,
+                            icon: option.dataset.icon
+                        });
+                        hideReactionPicker();
+                    }
+                });
+            });
+
+            // Touch events for message selection
+            let currentSwipeMessage = null;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let scrollPositionBeforeSelect = 0;
+            let longPressTimer = null;
+
+            chatMessages.addEventListener('touchstart', (e) => {
+                const messageElement = e.target.closest('.message');
+                if (!messageElement) return;
+                
+                currentSwipeMessage = messageElement;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                scrollPositionBeforeSelect = chatMessages.scrollTop;
+                
+                longPressTimer = setTimeout(() => {
+                    selectMessage(messageElement, e.touches[0].clientX, e.touches[0].clientY);
+                }, 500);
+            }, { passive: true });
+
+            chatMessages.addEventListener('touchmove', (e) => {
+                if (!currentSwipeMessage) return;
+                clearTimeout(longPressTimer);
+                
+                const touchX = e.touches[0].clientX;
+                const touchY = e.touches[0].clientY;
+                const deltaX = touchX - touchStartX;
+                const deltaY = touchY - touchStartY;
+                
+                // Horizontal swipe for reply
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    e.preventDefault();
+                    if (deltaX > 0) {
+                        currentSwipeMessage.style.transform = `translateX(${Math.min(deltaX, 100)}px)`;
+                    }
+                }
+                // Vertical swipe for scrolling
+                else {
+                    chatMessages.scrollTop = scrollPositionBeforeSelect - deltaY;
+                }
+            }, { passive: false });
+
+            chatMessages.addEventListener('touchend', (e) => {
+                clearTimeout(longPressTimer);
+                if (!currentSwipeMessage) return;
+                
+                const touchEndX = e.changedTouches[0].clientX;
+                const deltaX = touchEndX - touchStartX;
+                
+                // Swipe right to reply
+                if (deltaX > 50) {
+                    const messageId = currentSwipeMessage.dataset.id;
+                    const messageUsername = currentSwipeMessage.querySelector('.sender-name')?.textContent || 'You';
+                    const messageText = currentSwipeMessage.querySelector('.text')?.textContent || '[Media]';
+                    
+                    showReplyPreview(messageId, messageUsername, messageText);
+                }
+                
+                currentSwipeMessage.style.transform = '';
+                currentSwipeMessage = null;
+            }, { passive: true });
+
+            // Click outside to deselect
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.message') && !e.target.closest('.message-action-menu') && 
+                    !e.target.closest('.reaction-picker')) {
+                    hideMessageActionMenu();
+                }
+            });
+
+            // Desktop right-click context menu
+            chatMessages.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const messageElement = e.target.closest('.message');
+                if (messageElement) {
+                    selectMessage(messageElement, e.clientX, e.clientY);
+                }
+            });
+
+            function selectMessage(messageElement, x, y) {
+                selectedMessageId = messageElement.dataset.id;
+                
+                // Highlight the selected message
+                document.querySelectorAll('.message').forEach(msg => {
+                    msg.classList.remove('selected');
+                });
+                messageElement.classList.add('selected');
+                
+                // Position and show the action menu
+                const rect = messageElement.getBoundingClientRect();
+                messageActionMenu.style.left = `${x - messageActionMenu.offsetWidth/2}px`;
+                messageActionMenu.style.top = `${rect.top - 60}px`;
+                messageActionMenu.style.display = 'flex';
+            }
+
+            function hideMessageActionMenu() {
+                messageActionMenu.style.display = 'none';
+                document.querySelectorAll('.message').forEach(msg => {
+                    msg.classList.remove('selected');
+                });
+                selectedMessageId = null;
+            }
+
+            function showReactionPicker(x, y) {
+                reactionPicker.style.left = `${x - reactionPicker.offsetWidth/2}px`;
+                reactionPicker.style.top = `${y - 60}px`;
+                reactionPicker.style.display = 'block';
+                
+                setTimeout(() => {
+                    document.addEventListener('click', hideReactionPickerOnClick);
+                }, 100);
+            }
+
+            function hideReactionPicker() {
+                reactionPicker.style.display = 'none';
+                document.removeEventListener('click', hideReactionPickerOnClick);
+            }
+
+            function hideReactionPickerOnClick(e) {
+                if (!reactionPicker.contains(e.target)) {
+                    hideReactionPicker();
+                }
+            }
+
+            function appendMessage(message) {
+                const div = document.createElement('div');
+                
+                if(message.type === 'system') {
+                    div.classList.add('system-message');
+                    div.dataset.id = message.id;
+                    div.innerHTML = `<span>${message.text}</span>`;
+                } else {
+                    // Add safety checks for message sender
+                    const senderId = message.sender && message.sender._id ? message.sender._id.toString() : '';
+                    const isOwnMessage = senderId === userId;
+                    const senderProfileImage = message.sender && message.sender.profileImage ? message.sender.profileImage : '/images/default-profile.png';
+                    const senderUsername = message.sender && message.sender.username ? message.sender.username : 'Unknown';
+                    
+                    const messageClass = isOwnMessage ? 'own-message' : 'received-message';
+                    div.classList.add('message', messageClass);
+                    div.dataset.id = message.id;
+                    
+                    // Sender info for received messages
+                    if (!isOwnMessage) {
+                        const img = document.createElement('img');
+                        img.src = senderProfileImage;
+                        img.alt = senderUsername;
+                        img.className = 'profile-img-xs';
+                        div.appendChild(img);
+                    }
+                    
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'message-content';
+                    
+                    // Sender name for received messages
+                    if (!isOwnMessage) {
+                        const senderName = document.createElement('span');
+                        senderName.className = 'sender-name';
+                        senderName.textContent = senderUsername;
+                        contentDiv.appendChild(senderName);
+                    }
+                    
+                    // Reply preview
+                    if (message.replyTo) {
+                        const replyDiv = document.createElement('div');
+                        replyDiv.className = 'reply-preview';
+                        
+                        const replyToSenderId = message.replyTo.senderId ? message.replyTo.senderId.toString() : '';
+                        const replyToName = replyToSenderId === userId ? 'you' : senderUsername;
+                        
+                        const meta = document.createElement('p');
+                        meta.className = 'reply-preview-meta';
+                        meta.textContent = `Replying to ${replyToName}`;
+                        
+                        const text = document.createElement('p');
+                        text.className = 'reply-preview-text';
+                        if (!message.replyTo.text) {
+                            text.classList.add('reply-preview-media');
+                            text.textContent = 'Media file';
+                        } else {
+                            text.textContent = message.replyTo.text;
+                        }
+                        
+                        replyDiv.appendChild(meta);
+                        replyDiv.appendChild(text);
+                        contentDiv.appendChild(replyDiv);
+                    }
+                    
+                    // Media content
+                    if (message.media) {
+                        const mediaContainer = document.createElement('div');
+                        mediaContainer.className = 'media-container';
+                        
+                        if (message.media.type === 'image') {
+                            const img = document.createElement('img');
+                            img.src = message.media.url;
+                            img.className = 'media-thumbnail';
+                            
+                            mediaContainer.appendChild(img);
+                        } else if (message.media.type === 'video') {
+                            const video = document.createElement('video');
+                            video.className = 'media-thumbnail';
+                            video.controls = true;
+                            
+                            const source = document.createElement('source');
+                            source.src = message.media.url;
+                            source.type = 'video/mp4';
+                            video.appendChild(source);
+                            
+                            mediaContainer.appendChild(video);
+                        } else if (message.media.type === 'audio') {
+                            const audio = document.createElement('audio');
+                            audio.className = 'media-thumbnail';
+                            audio.controls = true;
+                            
+                            const source = document.createElement('source');
+                            source.src = message.media.url;
+                            source.type = 'audio/mpeg';
+                            audio.appendChild(source);
+                            
+                            mediaContainer.appendChild(audio);
+                        }
+                        
+                        contentDiv.appendChild(mediaContainer);
+                    }
+                    
+                    // Text content
+                    if (message.text) {
+                        const textDiv = document.createElement('p');
+                        textDiv.className = 'text';
+                        textDiv.innerHTML = message.text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+                        contentDiv.appendChild(textDiv);
+                    }
+                    
+                    // Message meta (time, status, edited indicator)
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'message-meta';
+                    
+                    const timeSpan = document.createElement('span');
+                    timeSpan.className = 'time';
+                    timeSpan.textContent = new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    metaDiv.appendChild(timeSpan);
+                    
+                    if (isOwnMessage) {
+                        const statusSpan = document.createElement('span');
+                        statusSpan.className = 'status';
+                        
+                        const tick1 = document.createElement('span');
+                        tick1.className = 'status-tick';
+                        tick1.innerHTML = '<i class="fas fa-check"></i>';
+                        statusSpan.appendChild(tick1);
+                        
+                        if (message.read) {
+                            const tick2 = document.createElement('span');
+                            tick2.className = 'status-tick';
+                            tick2.innerHTML = '<i class="fas fa-check"></i>';
+                            statusSpan.appendChild(tick2);
+                        }
+                        
+                        metaDiv.appendChild(statusSpan);
+                    }
+                    
+                    if (message.edited) {
+                        const editedSpan = document.createElement('span');
+                        editedSpan.className = 'edited-indicator';
+                        editedSpan.textContent = '(edited)';
+                        metaDiv.appendChild(editedSpan);
+                    }
+                    
+                    contentDiv.appendChild(metaDiv);
+                    div.appendChild(contentDiv);
+                }
+                
+                chatMessages.appendChild(div);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Add event listeners to the new message
+                addMessageEventListeners(div);
+            }
+
+            function addMessageEventListeners(messageElement) {
+                // Media click handlers
+                const mediaThumbnail = messageElement.querySelector('.media-thumbnail');
+                if (mediaThumbnail) {
+                    const mediaUrl = mediaThumbnail.src || 
+                                    (mediaThumbnail.querySelector('source') ? 
+                                     mediaThumbnail.querySelector('source').src : '');
+                    let mediaType;
+                    
+                    if (mediaThumbnail.tagName.toLowerCase() === 'img') {
+                        mediaType = 'image';
+                    } else if (mediaThumbnail.tagName.toLowerCase() === 'video') {
+                        mediaType = 'video';
+                    } else if (mediaThumbnail.tagName.toLowerCase() === 'audio') {
+                        mediaType = 'audio';
+                    }
+                    
+                    mediaThumbnail.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        
+                        if (mediaType === 'image') {
+                            previewImage.src = mediaUrl;
+                            previewImage.style.display = 'block';
+                            previewVideo.style.display = 'none';
+                            previewAudio.style.display = 'none';
+                        } else if (mediaType === 'video') {
+                            previewVideo.innerHTML = '';
+                            const source = document.createElement('source');
+                            source.src = mediaUrl;
+                            source.type = 'video/mp4';
+                            previewVideo.appendChild(source);
+                            previewVideo.style.display = 'block';
+                            previewImage.style.display = 'none';
+                            previewAudio.style.display = 'none';
+                        } else if (mediaType === 'audio') {
+                            previewAudio.innerHTML = '';
+                            const source = document.createElement('source');
+                            source.src = mediaUrl;
+                            source.type = 'audio/mpeg';
+                            previewAudio.appendChild(source);
+                            previewAudio.style.display = 'block';
+                            previewImage.style.display = 'none';
+                            previewVideo.style.display = 'none';
+                        }
+                        
+                        downloadBtn.href = mediaUrl;
+                        downloadBtn.download = mediaUrl.split('/').pop();
+                        mediaPreviewModal.style.display = 'flex';
+                    });
+                }
+                
+                // Link click handlers (open in new tab)
+                messageElement.querySelectorAll('a').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        window.open(link.href, '_blank');
+                    });
+                });
+            }
+            
+            function showReplyPreview(messageId, messageUsername, messageText) {
+                replyingTo = { id: messageId, username: messageUsername, text: messageText };
+                
+                replyPreview.querySelector('.reply-preview-meta').textContent = `Replying to ${messageUsername}`;
+                
+                if (messageText === '[Media]') {
+                    replyPreview.querySelector('.reply-preview-text').textContent = 'Media file';
+                    replyPreview.querySelector('.reply-preview-text').classList.add('reply-preview-media');
+                } else {
+                    replyPreview.querySelector('.reply-preview-text').textContent = messageText;
+                    replyPreview.querySelector('.reply-preview-text').classList.remove('reply-preview-media');
+                }
+                
+                replyPreview.style.display = 'flex';
+            }
+            
+            function hideReplyPreview() {
+                replyingTo = null;
+                replyPreview.style.display = 'none';
+            }
+            
+            async function getMediaData(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        resolve(event.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+            
+            // Add event listeners to existing messages
+            document.querySelectorAll('.message').forEach(message => {
+                addMessageEventListeners(message);
+            });
+        });
+    </script>
+</body>
+</html>

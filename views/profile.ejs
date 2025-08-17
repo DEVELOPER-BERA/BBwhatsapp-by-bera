@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1><i class="fas fa-user"></i> Profile</h1>
+            <div class="header-actions">
+                <a href="/home" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+            </div>
+        </header>
+        
+        <div class="profile-content">
+            <div class="profile-header">
+                <div class="profile-image-container">
+                    <img src="<%= profileUser.profileImage %>
+                                        <% if (isOwnProfile) { %>
+                        <button class="edit-profile-btn" id="edit-profile-btn">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                    <% } %>
+                </div>
+                <h2><%= profileUser.username %></h2>
+                <p class="profile-status"><%= profileUser.status %></p>
+                
+                <% if (!isOwnProfile) { %>
+                    <div class="profile-actions">
+                        <% if (isFollowing) { %>
+                            <form action="/unfollow/<%= profileUser._id %>" method="POST" class="follow-form">
+                                <button type="submit" class="btn unfollow-btn">
+                                    <i class="fas fa-user-minus"></i> Unfollow
+                                </button>
+                            </form>
+                        <% } else { %>
+                            <form action="/follow/<%= profileUser._id %>" method="POST" class="follow-form">
+                                <button type="submit" class="btn follow-btn">
+                                    <i class="fas fa-user-plus"></i> Follow
+                                </button>
+                            </form>
+                        <% } %>
+                        <a href="/new-chat/<%= profileUser._id %>" class="btn message-btn">
+                            <i class="fas fa-comment"></i> Message
+                        </a>
+                    </div>
+                <% } %>
+            </div>
+            
+            <% if (isOwnProfile) { %>
+                <div class="profile-edit-form" id="profile-edit-form" style="display: none;">
+                    <form action="/profile/update" method="POST" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" value="<%= profileUser.username %>" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <input type="text" id="status" name="status" value="<%= profileUser.status %>">
+                        </div>
+                        <div class="form-group">
+                            <label for="profileImage">Profile Picture</label>
+                            <input type="file" id="profileImage" name="profileImage" accept="image/*">
+                        </div>
+                        <button type="submit" class="btn save-btn">Save Changes</button>
+                    </form>
+                </div>
+            <% } %>
+            
+            <div class="profile-details">
+                <div class="detail-section">
+                    <h3>About</h3>
+                    <p>Joined on <%= new Date(profileUser.createdAt).toLocaleDateString() %></p>
+                    <p>Last seen: <%= profileUser.lastSeen ? new Date(profileUser.lastSeen).toLocaleString() : 'Online' %></p>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>Following <span class="count"><%= profileUser.following.length %></span></h3>
+                    <% if (profileUser.following.length > 0) { %>
+                        <div class="users-grid">
+                            <% profileUser.following.forEach(user => { %>
+                                <a href="/profile/<%= user._id %>" class="user-card">
+                                    <img src="<%= user.profileImage %>" alt="<%= user.username %>" class="profile-img-xs">
+                                    <span><%= user.username %></span>
+                                </a>
+                            <% }); %>
+                        </div>
+                    <% } else { %>
+                        <p>Not following anyone yet</p>
+                    <% } %>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>Followers <span class="count"><%= profileUser.followers.length %></span></h3>
+                    <% if (profileUser.followers.length > 0) { %>
+                        <div class="users-grid">
+                            <% profileUser.followers.forEach(user => { %>
+                                <a href="/profile/<%= user._id %>" class="user-card">
+                                    <img src="<%= user.profileImage %>" alt="<%= user.username %>" class="profile-img-xs">
+                                    <span><%= user.username %></span>
+                                </a>
+                            <% }); %>
+                        </div>
+                    <% } else { %>
+                        <p>No followers yet</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const editProfileBtn = document.getElementById('edit-profile-btn');
+            const profileEditForm = document.getElementById('profile-edit-form');
+            
+            if (editProfileBtn && profileEditForm) {
+                editProfileBtn.addEventListener('click', () => {
+                    if (profileEditForm.style.display === 'none') {
+                        profileEditForm.style.display = 'block';
+                    } else {
+                        profileEditForm.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
