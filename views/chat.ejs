@@ -1,69 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>BBWhatsapp - Chat</title>
+  <title>BBWhatsApp Chat</title>
+  <link rel="stylesheet" href="/css/chat.css">
   <script src="/socket.io/socket.io.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin:0; padding:0; }
-    #chat-container { display: flex; height: 100vh; }
-    #sidebar { width: 25%; background:#f0f0f0; border-right:1px solid #ccc; padding:10px; overflow-y:auto; }
-    #chat { flex: 1; display:flex; flex-direction: column; }
-    #chat-header { padding:10px; border-bottom:1px solid #ccc; background:#eee; font-weight:bold; }
-    #messages { flex:1; padding:10px; overflow-y:auto; }
-    #form { display:flex; border-top:1px solid #ccc; }
-    #form input { flex:1; padding:10px; border:none; }
-    #form button { padding:10px; border:none; background:#25d366; color:white; cursor:pointer; }
-    .msg { margin:5px 0; }
-    .system { color:gray; font-style:italic; }
-    .me { color:green; }
-    .user-item { cursor:pointer; padding:5px; }
-    .user-item:hover { background:#ddd; }
-  </style>
 </head>
 <body>
-  <div id="chat-container">
+  <div class="chat-container">
     <!-- Sidebar -->
-    <div id="sidebar">
+    <div class="sidebar">
+      <h2><%= user %></h2>
       <h3>Users</h3>
-      <ul id="users">
-        <% if (users && users.length > 0) { %>
-          <% users.forEach(function(u){ %>
-            <li class="user-item"><%= u %></li>
-          <% }) %>
-        <% } %>
+      <ul id="userList">
+        <% users.forEach(u => { %>
+          <li class="user" data-username="<%= u %>"><%= u %></li>
+        <% }) %>
       </ul>
 
-      <h4>Groups</h4>
-      <ul id="groups">
-        <% if (groups && groups.length > 0) { %>
-          <% groups.forEach(function(g){ %>
-            <li><button onclick="joinRoom('<%= g %>')">Join <%= g %></button></li>
-          <% }) %>
-        <% } else { %>
-          <li>No groups available</li>
-        <% } %>
+      <h3>Groups</h3>
+      <ul id="groupList">
+        <% Object.keys(groups).forEach(g => { %>
+          <li class="group" data-group="<%= g %>"><%= g %></li>
+        <% }) %>
       </ul>
+
+      <h3>Global Chat</h3>
+      <button id="globalBtn">Enter Global Chat</button>
     </div>
 
-    <!-- Chat section -->
-    <div id="chat">
-      <div id="chat-header">Global Chat</div>
+    <!-- Chat Window -->
+    <div class="chat-window">
+      <div id="chatHeader">Global Chat</div>
       <div id="messages">
-        <% if (messages && messages.length > 0) { %>
-          <% messages.forEach(function(m){ %>
-            <div class="msg <%= m.username === user ? 'me' : '' %>">
-              [<%= new Date(m.timestamp).toLocaleTimeString() %>] 
-              <strong><%= m.username %>:</strong> <%= m.text %>
-            </div>
-          <% }) %>
-        <% } else { %>
-          <p class="system">No messages yet...</p>
-        <% } %>
+        <% globalMessages.forEach(m => { %>
+          <div class="msg"><strong><%= m.username %>:</strong> <%= m.text %></div>
+        <% }) %>
       </div>
-
-      <form id="form">
-        <input id="input" autocomplete="off" placeholder="Type a message..."/>
+      <form id="chatForm">
+        <input id="msgInput" autocomplete="off" placeholder="Type a message..."/>
         <button>Send</button>
       </form>
     </div>
@@ -71,85 +45,96 @@
 
   <script>
     const socket = io();
-    let currentChat = "global"; // default chat target
-    let privateTo = null;
+    const user = "<%= user %>";
+    const msgInput = document.getElementById("msgInput");
+    const chatForm = document.getElementById("chatForm");
+    const messages = document.getElementById("messages");
+    const chatHeader = document.getElementById("chatHeader");
 
-    // username comes from server-side
-    const username = "<%= user %>";
-    socket.emit("join", username);
+    let currentChat = "global"; // global | private:username | group:groupName
 
-    // DOM elements
-    const form = document.getElementById('form');
-    const input = document.getElementById('input');
-    const messages = document.getElementById('messages');
-    const usersList = document.getElementById('users');
-    const chatHeader = document.getElementById('chat-header');
+    socket.emit("join", user);
 
-    // Add message
-    function addMessage(msg) {
-      const item = document.createElement('div');
-      item.classList.add('msg');
-      if (msg.username === 'System') {
-        item.classList.add('system');
-      } else if (msg.username === username) {
-        item.classList.add('me');
+    // --- Global Chat ---
+    socket.on("globalMessage", (msg) => {
+      if (currentChat === "global") {
+        appendMsg(msg);
       }
-      item.textContent = `[${new Date(msg.timestamp).toLocaleTimeString()}] ${msg.username}: ${msg.text}`;
-      messages.appendChild(item);
-      messages.scrollTop = messages.scrollHeight;
-    }
+    });
 
-    // Socket events
-    socket.on('message', addMessage);
+    // --- Private Chat ---
+    socket.on("privateMessage", (msg) => {
+      if (currentChat === `private:${msg.from}` || currentChat === `private:${msg.to}`) {
+        appendMsg({ username: msg.from, text: msg.text });
+      }
+    });
 
-    socket.on('users', (users) => {
-      usersList.innerHTML = '';
-      users.forEach(u => {
-        if (u !== username) {
-          const li = document.createElement('li');
-          li.textContent = u;
-          li.classList.add('user-item');
-          li.onclick = () => {
-            currentChat = "private";
-            privateTo = u;
-            chatHeader.textContent = "Chat with " + u;
-            messages.innerHTML = '';
-          };
-          usersList.appendChild(li);
-        }
+    // --- Group Messages ---
+    socket.on("groupMessages", ({ room, messages: msgs }) => {
+      if (currentChat === `group:${room}`) {
+        messages.innerHTML = "";
+        msgs.forEach(m => appendMsg(m));
+      }
+    });
+    socket.on("groupMessage", ({ room, message }) => {
+      if (currentChat === `group:${room}`) {
+        appendMsg(message);
+      }
+    });
+
+    // --- Switch Chats ---
+    document.querySelectorAll(".user").forEach(u => {
+      u.addEventListener("click", () => {
+        const target = u.dataset.username;
+        currentChat = `private:${target}`;
+        chatHeader.innerText = "Chat with " + target;
+        messages.innerHTML = "";
       });
     });
 
-    socket.on('privateMessage', (msg) => {
-      if (msg.from === privateTo || msg.to === username) {
-        addMessage({
-          username: msg.from,
-          text: msg.text,
-          timestamp: msg.timestamp
-        });
-      }
+    document.querySelectorAll(".group").forEach(g => {
+      g.addEventListener("click", () => {
+        const group = g.dataset.group;
+        currentChat = `group:${group}`;
+        chatHeader.innerText = group;
+        messages.innerHTML = "";
+        socket.emit("joinRoom", group);
+      });
     });
 
-    // Form submit
-    form.addEventListener('submit', (e) => {
+    document.getElementById("globalBtn").addEventListener("click", () => {
+      currentChat = "global";
+      chatHeader.innerText = "Global Chat";
+      messages.innerHTML = "";
+      <% globalMessages.forEach(m => { %>
+        appendMsg({ username: "<%= m.username %>", text: "<%= m.text %>" });
+      <% }) %>
+    });
+
+    // --- Send Message ---
+    chatForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      if (input.value) {
-        if (currentChat === "global") {
-          socket.emit('chatMessage', { username, text: input.value });
-        } else if (currentChat === "private" && privateTo) {
-          socket.emit('privateMessage', { to: privateTo, text: input.value });
-        }
-        input.value = '';
+      if (!msgInput.value) return;
+
+      if (currentChat === "global") {
+        socket.emit("chatMessage", { username: user, text: msgInput.value });
+      } else if (currentChat.startsWith("private:")) {
+        const to = currentChat.split(":")[1];
+        socket.emit("privateMessage", { to, text: msgInput.value });
+      } else if (currentChat.startsWith("group:")) {
+        const room = currentChat.split(":")[1];
+        socket.emit("groupMessage", { room, text: msgInput.value });
       }
+
+      msgInput.value = "";
     });
 
-    // Join group
-    function joinRoom(room) {
-      currentChat = "group";
-      privateTo = room;
-      chatHeader.textContent = "Group: " + room;
-      messages.innerHTML = '';
-      socket.emit('joinRoom', room);
+    function appendMsg(msg) {
+      const div = document.createElement("div");
+      div.classList.add("msg");
+      div.innerHTML = `<strong>${msg.username}:</strong> ${msg.text}`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
     }
   </script>
 </body>
